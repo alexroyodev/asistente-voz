@@ -13,7 +13,7 @@ from asistente.router import Router, normalizar
 from asistente.skills import cargar_skills
 from asistente.skills.base import Peticion
 from asistente.skills.chiste import ChisteSkill
-from asistente.skills.hora import HoraSkill
+from asistente.skills.hora import HoraSkill, decir_hora
 from asistente.skills.temporizador import TemporizadorSkill
 from asistente.skills.tiempo import TiempoSkill
 
@@ -63,9 +63,32 @@ def test_transicion_invalida():  # TODO(human) en estado.py
 
 # --- Skills ---------------------------------------------------------------
 
-def test_hora():
+def test_hora_usa_el_reloj_inyectado():  # TODO(human) en hora.py
     skill = HoraSkill(ahora=lambda: datetime(2026, 1, 1, 9, 5))
-    assert skill.ejecutar(Peticion("que hora es")).texto == "Son las 9:05."
+    assert skill.ejecutar(Peticion("que hora es")).texto == "Son las 9 y 5."
+
+
+@pytest.mark.parametrize(
+    "hora, minuto, esperado",
+    [
+        (9, 0, "Son las 9 en punto."),
+        (9, 5, "Son las 9 y 5."),
+        (9, 15, "Son las 9 y cuarto."),
+        (9, 30, "Son las 9 y media."),
+        (9, 31, "Son las 10 menos 29."),
+        (9, 45, "Son las 10 menos cuarto."),
+        (17, 48, "Son las 6 menos 12."),
+        (13, 0, "Es la 1 en punto."),
+        (13, 20, "Es la 1 y 20."),
+        (12, 45, "Es la 1 menos cuarto."),
+        (12, 10, "Son las 12 y 10."),
+        (0, 0, "Son las 12 en punto."),
+        (0, 40, "Es la 1 menos 20."),
+        (23, 50, "Son las 12 menos 10."),
+    ],
+)
+def test_decir_hora(hora, minuto, esperado):  # TODO(human) en hora.py
+    assert decir_hora(hora, minuto) == esperado
 
 
 def test_temporizador_confirma_y_avisa():  # TODO(human) en temporizador.py
