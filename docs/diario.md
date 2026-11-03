@@ -228,6 +228,21 @@ después, fase 3 (faster-whisper + VAD, pulsar para hablar).
 **Siguiente:** fase 3, entrada de voz con faster-whisper + VAD (pulsar
 para hablar). Antes: ¿qué tamaño de Whisper cabe bien en 4 GB de VRAM?
 
+### Añadido: franja del día
+
+- Decisiones mías: franjas madrugada 1-5 · mañana 6-12 · tarde 13-20 ·
+  noche 21-0; la franja la decide la hora QUE SE DICE (12:45 → "de la
+  tarde"); especiales 12:00 "del mediodía" y 0:00 "de la noche".
+  Código de Claude. Tests: 43/43.
+- Aprendido: transformar pierde información. En 12 h el 6 puede ser 6:00 o
+  18:00, así que la hora en 24 h hay que calcularla desde los datos
+  originales (`(hora + 1) % 24`), no desde `hora_final`.
+- Los casos especiales SUSTITUYEN partes de la frase (`complemento`), así se
+  mantiene un único `return`.
+- La noche es la única franja no contigua (21-23 y 0): por eso va en el `else`.
+- Un test a cada lado de cada frontera (5:30/5:50, 20:30/20:59) pilla los
+  errores de `<` frente a `<=`.
+
 ---
 
 ## AAAA-MM-DD — Título

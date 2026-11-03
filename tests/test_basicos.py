@@ -1,7 +1,6 @@
-"""Tests de la fase 1. Ejecuta con:  python -m pytest
+"""Tests del núcleo y las skills. Ejecuta con:  python -m pytest
 
 Cada TODO(human) del código tiene aquí sus tests: cuando pasan todos, está hecho.
-Cuando pasen todos, la fase 1 está terminada.
 """
 import random
 from datetime import datetime
