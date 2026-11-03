@@ -1,6 +1,6 @@
 """Tests de la fase 1. Ejecuta con:  python -m pytest
 
-Algunos fallarán al principio a propósito: son tus TODO(human).
+Cada TODO(human) del código tiene aquí sus tests: cuando pasan todos, está hecho.
 Cuando pasen todos, la fase 1 está terminada.
 """
 import random
@@ -55,7 +55,7 @@ def test_transicion_valida():
     assert m.estado is Estado.PENSANDO
 
 
-def test_transicion_invalida():  # TODO(human) en estado.py
+def test_transicion_invalida():
     m = MaquinaEstados()
     with pytest.raises(TransicionInvalida):
         m.transicionar(Estado.HABLANDO)  # de REPOSO no se puede hablar directamente
@@ -63,35 +63,46 @@ def test_transicion_invalida():  # TODO(human) en estado.py
 
 # --- Skills ---------------------------------------------------------------
 
-def test_hora_usa_el_reloj_inyectado():  # TODO(human) en hora.py
+def test_hora_usa_el_reloj_inyectado():
     skill = HoraSkill(ahora=lambda: datetime(2026, 1, 1, 9, 5))
-    assert skill.ejecutar(Peticion("que hora es")).texto == "Son las 9 y 5."
+    assert skill.ejecutar(Peticion("que hora es")).texto == "Son las 9 y 5 de la mañana."
 
 
 @pytest.mark.parametrize(
     "hora, minuto, esperado",
     [
-        (9, 0, "Son las 9 en punto."),
-        (9, 5, "Son las 9 y 5."),
-        (9, 15, "Son las 9 y cuarto."),
-        (9, 30, "Son las 9 y media."),
-        (9, 31, "Son las 10 menos 29."),
-        (9, 45, "Son las 10 menos cuarto."),
-        (17, 48, "Son las 6 menos 12."),
-        (13, 0, "Es la 1 en punto."),
-        (13, 20, "Es la 1 y 20."),
-        (12, 45, "Es la 1 menos cuarto."),
-        (12, 10, "Son las 12 y 10."),
-        (0, 0, "Son las 12 en punto."),
-        (0, 40, "Es la 1 menos 20."),
-        (23, 50, "Son las 12 menos 10."),
+        # Formato básico (ya funcionaba), ahora con franja.
+        (9, 0, "Son las 9 en punto de la mañana."),
+        (9, 5, "Son las 9 y 5 de la mañana."),
+        (9, 15, "Son las 9 y cuarto de la mañana."),
+        (9, 30, "Son las 9 y media de la mañana."),
+        (9, 31, "Son las 10 menos 29 de la mañana."),
+        (9, 45, "Son las 10 menos cuarto de la mañana."),
+        (17, 48, "Son las 6 menos 12 de la tarde."),
+        (13, 0, "Es la 1 en punto de la tarde."),
+        (13, 20, "Es la 1 y 20 de la tarde."),
+        (12, 10, "Son las 12 y 10 de la mañana."),
+        (3, 0, "Son las 3 en punto de la madrugada."),
+        # Fronteras de franja: la decide la hora QUE SE DICE.
+        (12, 45, "Es la 1 menos cuarto de la tarde."),     # real 12, se dice 13
+        (5, 30, "Son las 5 y media de la madrugada."),
+        (5, 50, "Son las 6 menos 10 de la mañana."),        # real 5, se dice 6
+        (11, 40, "Son las 12 menos 20 de la mañana."),
+        (20, 30, "Son las 8 y media de la tarde."),
+        (20, 59, "Son las 9 menos 1 de la noche."),         # real 20, se dice 21
+        (23, 50, "Son las 12 menos 10 de la noche."),       # se dice 0
+        (0, 10, "Son las 12 y 10 de la noche."),
+        (0, 40, "Es la 1 menos 20 de la madrugada."),       # real 0, se dice 1
+        # Casos especiales.
+        (12, 0, "Son las 12 del mediodía."),
+        (0, 0, "Son las 12 de la noche."),
     ],
 )
-def test_decir_hora(hora, minuto, esperado):  # TODO(human) en hora.py
+def test_decir_hora(hora, minuto, esperado):
     assert decir_hora(hora, minuto) == esperado
 
 
-def test_temporizador_confirma_y_avisa():  # TODO(human) en temporizador.py
+def test_temporizador_confirma_y_avisa():
     avisos = []
     skill = TemporizadorSkill(avisar=avisos.append)
     r = skill.ejecutar(Peticion("", {"cantidad": "1", "unidad": "segundo"}))
@@ -101,13 +112,13 @@ def test_temporizador_confirma_y_avisa():  # TODO(human) en temporizador.py
     assert avisos, "El temporizador debería haber avisado"
 
 
-def test_tiempo_con_datos_falsos():  # TODO(human) en tiempo.py
+def test_tiempo_con_datos_falsos():
     falso = lambda url: {"current": {"temperature_2m": 18.4, "weather_code": 3}}
     r = TiempoSkill(obtener=falso).ejecutar(Peticion("que tiempo hace"))
     assert "18" in r.texto and "nublado" in r.texto
 
 
-def test_tiempo_sin_red_no_revienta():  # TODO(human) en tiempo.py
+def test_tiempo_sin_red_no_revienta():
     def sin_red(url):
         raise OSError("sin conexión")
     r = TiempoSkill(obtener=sin_red).ejecutar(Peticion("que tiempo hace"))
