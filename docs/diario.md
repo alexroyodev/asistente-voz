@@ -245,6 +245,64 @@ para hablar). Antes: ¿qué tamaño de Whisper cabe bien en 4 GB de VRAM?
 
 ---
 
+## 2026-11-03 — Fase 3: el asistente escucha (Whisper + VAD)
+
+**Objetivo:** hablarle al asistente con "pulsar para hablar".
+
+**Hecho:**
+- faster-whisper en GPU con las DLL de CUDA instaladas por `pip` (sin
+  CUDA Toolkit), registradas con `os.add_dll_directory`.
+- `experimentos/probar_whisper.py`: comparativa small/turbo con mi micro.
+- `asistente/oido.py`: contrato `Oido` + `OidoTeclado` + `OidoWhisper`.
+  Decisiones mías (devuelve `None`, Enter empieza y el VAD termina, tres
+  capas anti-alucinación, `--teclado`/`--texto` separados, modelo
+  configurable con turbo por defecto); código de Claude.
+- ADR 0003 (propuesta). Tests: 54/54.
+- Primera conversación completa por voz: hora, temporizador, chiste, salir.
+
+**Aprendido:**
+- Whisper: voz → texto con un transformer; faster-whisper lo acelera con
+  CTranslate2 y cuantización (int8). Tamaños: más grande = mejor y más lento.
+- VAD (Silero): "¿hay voz en estos 32 ms?". Sirve para recortar silencios
+  (evita alucinaciones) y para detectar el fin de frase.
+- faster-whisper ya trae Silero en ONNX (`get_vad_model()`): sin PyTorch.
+  No guarda estado entre llamadas → reevalúo todo lo grabado cada 100 ms
+  (~4 ms por 2,4 s de audio).
+- `transcribe()` devuelve un GENERADOR: la transcripción ocurre al consumir
+  los segmentos. Medir solo la llamada da ~0 ms.
+- Whisper escribe los números en cifras ("10"): por eso encaja con la regex
+  del temporizador. No está garantizado: es una frontera ML → código a vigilar.
+- Audio dudoso = más lento y peor (temperature fallback).
+- `normalizar()` de la fase 1 ya compensa: quita "¿", tildes y puntos de
+  Whisper (también para "Salir.").
+- Las reglas por palabra clave toleran errores de transcripción: "¿Contamos
+  un chiste?" sigue llegando a la skill de chistes.
+- Lo difícil (¿ha acabado de hablar?, ¿me fío del texto?) en funciones puras:
+  8 tests sin micrófono ni GPU.
+- Primera vez que se recorre la máquina de estados entera:
+  REPOSO → ESCUCHANDO → PENSANDO → HABLANDO → REPOSO.
+
+**Latencias medidas (RTX 3050 Ti, int8_float16):**
+- small: ~335 MiB VRAM, 340-470 ms, falla con habla rápida.
+- turbo: ~880 MiB VRAM, 540-730 ms (1ª transcripción ~930 ms), entiende mejor.
+- Percibida ≈ 0,8 s (silencio de fin) + ~0,6 s (Whisper) + ~0,08 s (Piper)
+  ≈ 1,5 s. El mayor sumando es ESPERAR a confirmar que me he callado.
+
+**Problemas / dudas:**
+- Una pausa al hablar me cortó la frase ("que"): 0,8 s de silencio es poco
+  para pausas, mucho para la latencia. Equilibrio del turn-taking.
+- **Eco:** el aviso del temporizador habla desde otro hilo mientras el bucle
+  ya está en ESCUCHANDO → el micro podría grabar a Piper. El problema de
+  "los avisos se saltan la máquina de estados" ya tiene consecuencias.
+- Hugging Face consulta internet al arrancar (comprobación de versión).
+- Sin GPU, `OidoWhisper` no arranca (no hay modo CPU todavía).
+- Pendiente probar `small` + `initial_prompt` para ahorrar VRAM.
+
+**Siguiente:** aceptar el ADR 0003; decidir el silencio de fin; resolver el
+eco (los avisos deben pasar por el bucle principal) antes de la fase 4.
+
+---
+
 ## AAAA-MM-DD — Título
 
 **Objetivo:**
