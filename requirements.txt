@@ -7,8 +7,13 @@ piper-tts
 sounddevice
 numpy
 
+# Fase 3: voz a texto (trae Silero VAD dentro).
+faster-whisper
+# GPU en Windows sin instalar el CUDA Toolkit: DLL de cuBLAS y cuDNN 9.
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*
+
 # Fases siguientes (no instalar todavía):
-# faster-whisper      # fase 3: voz a texto (GPU con CUDA 12 + cuDNN 9)
-# silero-vad          # fase 3: detección de fin de frase
-# openwakeword        # fase 4: palabra de activación
+# silero-vad          # fase 4: fin de frase en streaming (si el de faster-whisper no basta)
+# openwakeword       # fase 4: palabra de activación
 # ollama              # fase 5: cliente del LLM local
