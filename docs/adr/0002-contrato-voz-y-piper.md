@@ -1,6 +1,6 @@
 # ADR 0002: Salida de voz detrás de un contrato `Voz`, con Piper en CPU
 
-- **Estado:** propuesta
+- **Estado:** aceptada
 - **Fecha:** 2026-11-03
 
 ## Contexto

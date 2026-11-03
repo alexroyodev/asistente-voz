@@ -191,6 +191,45 @@ después, fase 3 (faster-whisper + VAD, pulsar para hablar).
 
 ---
 
+## 2026-11-03 — Hora natural, git y cierre de la fase 2
+
+**Objetivo:** que la hora suene humana con Piper y poner el proyecto en git.
+
+**Hecho:**
+- Repositorio git (`main`) enlazado a GitHub (`origin`). Commits a mi nombre.
+- README actualizado: arquitectura actual, uso (`--texto`, `-v`), fases.
+- ADR 0002 revisado y **aceptado**.
+- `HoraSkill`: nueva función pura `decir_hora(hora, minuto)`. La lógica de
+  horas la escribí yo (12 de 16 tests); la reestructuración final, Claude.
+- Tests: 35/35 (14 casos parametrizados de la hora).
+
+**Aprendido:**
+- `hora % 12` da 0 a las 0:00 y a las 12:00 → corregir a 12. Y para la hora
+  siguiente, `(hora_12 % 12) + 1`: así de 12 se pasa a 1, nunca a 13.
+  Respuesta del diario: 23:50 → "las 12 menos 10"; 12:50 → "la 1 menos 10".
+- Mi primera versión tenía `"Son las"` copiado en 6 ramas y por eso se me
+  escapó el singular ("Es la 1"). Si un mismo dato está repetido en N
+  sitios, cada regla nueva hay que aplicarla N veces. Mejor: calcular las
+  partes (`hora_final`, `resto`) y montar la frase en un único `return`.
+- Un dict con `.get(clave, por_defecto)` sustituye a una cadena de `elif`
+  para los casos con nombre propio ("en punto", "y cuarto", "y media").
+  Ojo: el valor por defecto se evalúa siempre.
+- Separar "obtener datos" (reloj, en `ejecutar`) de "transformarlos"
+  (`decir_hora`, función pura) permite testear con una tabla de casos.
+- Los tests parametrizados diagnostican solos: los 4 fallos eran justo las
+  horas que acaban en 1.
+- En voz, el texto de la respuesta es parte de la interfaz.
+
+**Problemas / dudas:**
+- La hora es ambigua sin "de la mañana/tarde/noche". ¿Hace falta?
+- Siguen abiertos (ver entrada anterior): cola de eventos para avisos,
+  `Lock` en `MaquinaEstados`, Ctrl+C mientras habla, `parar()` sin probar.
+
+**Siguiente:** fase 3, entrada de voz con faster-whisper + VAD (pulsar
+para hablar). Antes: ¿qué tamaño de Whisper cabe bien en 4 GB de VRAM?
+
+---
+
 ## AAAA-MM-DD — Título
 
 **Objetivo:**

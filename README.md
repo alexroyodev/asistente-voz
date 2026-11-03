@@ -75,6 +75,6 @@ Prueba: "¿qué hora es?", "pon un temporizador de 10 segundos",
 
 ## Pendientes
 
-- [ ] Revisar y aceptar el ADR 0002 (contrato `Voz`).
-- [ ] `HoraSkill`: decir la hora como una persona ("las seis menos doce").
+- [x] Revisar y aceptar el ADR 0002 (contrato `Voz`).
+- [x] `HoraSkill`: decir la hora como una persona ("las seis menos doce").
 - [ ] Fase 3: entrada de voz.
