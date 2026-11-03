@@ -1,8 +1,10 @@
-"""Bucle principal: entrada por teclado, salida por voz (fase 2).
+"""Bucle principal: entrada por micrófono o teclado, salida por voz o pantalla.
 
-Ejecuta con:  python -m asistente           (habla con Piper)
-              python -m asistente --texto   (solo imprime)
-Con -v verás los cambios de estado y cuánto tarda cada respuesta.
+Ejecuta con:  python -m asistente                    (micrófono + Piper)
+              python -m asistente --teclado          (escribes en vez de hablar)
+              python -m asistente --texto            (imprime en vez de hablar)
+              python -m asistente --whisper small    (otro modelo de Whisper)
+Con -v verás los cambios de estado y cuánto tarda cada paso.
 """
 from __future__ import annotations
 
@@ -12,12 +14,33 @@ import time
 from pathlib import Path
 
 from asistente.estado import Estado, MaquinaEstados
-from asistente.router import Router
+from asistente.oido import Oido, OidoTeclado, OidoWhisper
+from asistente.router import Router, normalizar
 from asistente.skills import cargar_skills
 from asistente.voz import Voz, VozPiper, VozTexto
 
 SALIR = {"salir", "adios", "hasta luego"}
 MODELO_VOZ = Path("modelos/es_ES-davefx-medium.onnx")
+WHISPER_POR_DEFECTO = "turbo"  # "small" ahorra ~550 MiB de VRAM (ver ADR 0003)
+
+
+def opcion(nombre: str, defecto: str) -> str:
+    """Valor tras `nombre` en la línea de órdenes (--whisper small)."""
+    if nombre in sys.argv:
+        i = sys.argv.index(nombre)
+        if i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+    return defecto
+
+
+def crear_oido(log: logging.Logger) -> Oido:
+    if "--teclado" in sys.argv:
+        return OidoTeclado()
+    modelo = opcion("--whisper", WHISPER_POR_DEFECTO)
+    inicio = time.perf_counter()
+    oido = OidoWhisper(modelo)
+    log.debug("Whisper %s cargado en %.0f ms", modelo, (time.perf_counter() - inicio) * 1000)
+    return oido
 
 
 def crear_voz(log: logging.Logger) -> Voz:
@@ -43,19 +66,23 @@ def main() -> None:
 
     maquina = MaquinaEstados()
     voz = crear_voz(log)
+    oido = crear_oido(log)
     router = Router(cargar_skills(voz))
-    print("Asistente listo. Escribe 'salir' para terminar.")
+    print("Asistente listo. Di o escribe 'salir' para terminar (o Ctrl+C).")
 
     while True:
+        maquina.transicionar(Estado.ESCUCHANDO)
         try:
-            texto = input("> ").strip()
+            texto = oido.escuchar()
         except (EOFError, KeyboardInterrupt):
             print()
             break
-        if not texto:
+        if texto is None:
+            maquina.transicionar(Estado.REPOSO)  # no se entendió nada: ni se responde
             continue
-        if texto.lower() in SALIR:
-            print("¡Hasta luego!")
+        # normalizar: Whisper devuelve "¡Adiós!" o "Salir." con signos y tildes.
+        if normalizar(texto) in SALIR:
+            voz.decir("¡Hasta luego!")
             break
 
         inicio = time.perf_counter()
