@@ -1,0 +1,14 @@
+# Fase 1: solo hace falta pytest (el resto es librería estándar).
+pytest>=8
+
+# Fase 2: texto a voz y reproducción de audio.
+# Voz: python -m piper.download_voices es_ES-davefx-medium --data-dir modelos
+piper-tts
+sounddevice
+numpy
+
+# Fases siguientes (no instalar todavía):
+# faster-whisper      # fase 3: voz a texto (GPU con CUDA 12 + cuDNN 9)
+# silero-vad          # fase 3: detección de fin de frase
+# openwakeword        # fase 4: palabra de activación
+# ollama              # fase 5: cliente del LLM local
