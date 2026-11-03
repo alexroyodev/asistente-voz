@@ -61,7 +61,10 @@ def crear_voz(log: logging.Logger) -> Voz:
 def main() -> None:
     nivel = logging.DEBUG if "-v" in sys.argv else logging.WARNING
     logging.basicConfig(level=nivel, format="%(levelname)s %(name)s: %(message)s")
-    logging.getLogger("piper").setLevel(logging.WARNING)  # con -v vuelca fonemas
+    # Con -v solo queremos NUESTRO log; estas librerías vuelcan sus detalles.
+    for ruidosa in ("piper", "faster_whisper", "httpx", "httpx2", "httpcore",
+                    "httpcore2", "huggingface_hub", "urllib3"):
+        logging.getLogger(ruidosa).setLevel(logging.WARNING)
     log = logging.getLogger("asistente")
 
     maquina = MaquinaEstados()
