@@ -76,18 +76,12 @@ ESQUEMA = {
     "required": ["intencion", "cantidad", "unidad"],
 }
 SISTEMA_CLASIFICAR = (
-    "Clasifica la petición del usuario a un asistente de voz.
-"
-    "- hora: pregunta por la hora actual o algo que dependa de ella.
-"
-    "- temporizador: quiere que le avisen tras un tiempo (rellena cantidad y unidad).
-"
-    "- tiempo: el tiempo meteorológico, lluvia, frío, calor, paraguas.
-"
-    "- chiste: quiere reírse o un chiste.
-"
-    "- conversar: cualquier otra cosa (saludos, gracias, cultura general).
-"
+    "Clasifica la petición del usuario a un asistente de voz.\n"
+    "- hora: pregunta por la hora actual o algo que dependa de ella.\n"
+    "- temporizador: quiere que le avisen tras un tiempo (rellena cantidad y unidad).\n"
+    "- tiempo: el tiempo meteorológico, lluvia, frío, calor, paraguas.\n"
+    "- chiste: quiere reírse o un chiste.\n"
+    "- conversar: cualquier otra cosa (saludos, gracias, cultura general).\n"
     "Si no es temporizador, cantidad y unidad son null."
 )
 
@@ -147,8 +141,7 @@ def probar(modelo: str) -> None:
             ms = (time.perf_counter() - t0) * 1000
             ok = datos["intencion"] == (esperada or "conversar")
             aciertos += ok
-            print(f"{'✅' if ok else '❌'} {ms:5.0f} ms · {frase!r}
-      → {datos}")
+            print(f"{'✅' if ok else '❌'} {ms:5.0f} ms · {frase!r}\n      → {datos}")
         print(f"Aciertos: {aciertos}/{len(CASOS)}")
         return
     for frase, esperada in CASOS:
