@@ -5,6 +5,10 @@ descargados (`ollama pull qwen3.5:2b`). Ejecuta desde la raíz del proyecto:
 
     python experimentos/probar_ollama.py qwen3.5:2b
     python experimentos/probar_ollama.py qwen3.5:2b llama3.2:3b   # comparar
+    python experimentos/probar_ollama.py llama3.2:3b --clasificar  # salida estructurada
+
+Resultados (2026-11-04, RTX 3050 Ti): tool calling 5/7 (abusa de las tools);
+salida estructurada con llama3.2:3b y num_ctx=2048: 10/10, 330-450 ms, 100 % en GPU.
 
 Para cada modelo mide:
   - carga y VRAM (si size_vram < size, parte del modelo está en la CPU: lento)
@@ -14,6 +18,7 @@ Para cada modelo mide:
 """
 from __future__ import annotations
 
+import json
 import sys
 import time
 
@@ -57,6 +62,35 @@ SISTEMA = (
     "Usa una herramienta solo si hace falta para responder."
 )
 
+NUM_CTX = 2048  # con 4096 la caché no deja que el modelo quepa entero en la GPU
+
+# Variante --clasificar: en vez de tool calling, un JSON obligado por un esquema.
+ESQUEMA = {
+    "type": "object",
+    "properties": {
+        "intencion": {"type": "string",
+                      "enum": ["hora", "temporizador", "tiempo", "chiste", "conversar"]},
+        "cantidad": {"type": ["integer", "null"]},
+        "unidad": {"type": ["string", "null"], "enum": ["segundo", "minuto", "hora", None]},
+    },
+    "required": ["intencion", "cantidad", "unidad"],
+}
+SISTEMA_CLASIFICAR = (
+    "Clasifica la petición del usuario a un asistente de voz.
+"
+    "- hora: pregunta por la hora actual o algo que dependa de ella.
+"
+    "- temporizador: quiere que le avisen tras un tiempo (rellena cantidad y unidad).
+"
+    "- tiempo: el tiempo meteorológico, lluvia, frío, calor, paraguas.
+"
+    "- chiste: quiere reírse o un chiste.
+"
+    "- conversar: cualquier otra cosa (saludos, gracias, cultura general).
+"
+    "Si no es temporizador, cantidad y unidad son null."
+)
+
 # (frase, tool esperada o None). Ninguna encaja con las regex de tu router.
 CASOS = [
     ("¿Me pones un temporizador de cinco minutos?", "temporizador"),
@@ -66,6 +100,9 @@ CASOS = [
     ("¿Llego tarde si son menos cuarto?", "hora"),
     ("¿Cuál es la capital de Portugal?", None),
     ("Gracias, eres muy maja", None),
+    ("Buenos días, Numa", None),
+    ("¿Cuántas patas tiene una araña?", None),
+    ("Pon una alarma en diez segundos", "temporizador"),
 ]
 
 
@@ -73,18 +110,28 @@ def chat(modelo: str, frase: str):
     mensajes = [{"role": "system", "content": SISTEMA}, {"role": "user", "content": frase}]
     try:
         # think=False: sin "pensar en voz alta" (añade segundos de latencia).
-        return ollama.chat(model=modelo, messages=mensajes, tools=TOOLS, think=False)
+        return ollama.chat(model=modelo, messages=mensajes, tools=TOOLS, think=False,
+                           options={"num_ctx": NUM_CTX})
     except ollama.ResponseError as e:
         if "think" not in str(e).lower():
             raise
-        return ollama.chat(model=modelo, messages=mensajes, tools=TOOLS)  # no soporta think
+        return ollama.chat(model=modelo, messages=mensajes, tools=TOOLS,  # no soporta think
+                           options={"num_ctx": NUM_CTX})
+
+
+def clasificar(modelo: str, frase: str) -> dict:
+    r = ollama.chat(model=modelo, format=ESQUEMA,
+                    options={"num_ctx": NUM_CTX, "temperature": 0},
+                    messages=[{"role": "system", "content": SISTEMA_CLASIFICAR},
+                              {"role": "user", "content": frase}])
+    return json.loads(r.message.content)
 
 
 def probar(modelo: str) -> None:
     print(f"\n══════ {modelo} ══════")
     t0 = time.perf_counter()
     ollama.chat(model=modelo, messages=[{"role": "user", "content": "hola"}],
-                keep_alive="10m")  # la primera llamada carga el modelo en la GPU
+                keep_alive="10m", options={"num_ctx": NUM_CTX})  # carga el modelo
     print(f"Carga + primera respuesta: {time.perf_counter() - t0:.1f} s")
     for m in ollama.ps().models:
         if m.model.startswith(modelo):
@@ -93,6 +140,17 @@ def probar(modelo: str) -> None:
                   f"({en_gpu:.0f} %) · contexto {m.context_length}")
 
     aciertos = 0
+    if "--clasificar" in sys.argv:
+        for frase, esperada in CASOS:
+            t0 = time.perf_counter()
+            datos = clasificar(modelo, frase)
+            ms = (time.perf_counter() - t0) * 1000
+            ok = datos["intencion"] == (esperada or "conversar")
+            aciertos += ok
+            print(f"{'✅' if ok else '❌'} {ms:5.0f} ms · {frase!r}
+      → {datos}")
+        print(f"Aciertos: {aciertos}/{len(CASOS)}")
+        return
     for frase, esperada in CASOS:
         t0 = time.perf_counter()
         r = chat(modelo, frase)
@@ -111,7 +169,7 @@ def probar(modelo: str) -> None:
 
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    modelos = sys.argv[1:] or ["qwen3.5:2b"]
+    modelos = [a for a in sys.argv[1:] if not a.startswith("-")] or ["llama3.2:3b"]
     for modelo in modelos:
         probar(modelo)
         ollama.generate(model=modelo, prompt="", keep_alive=0)  # libera la VRAM
