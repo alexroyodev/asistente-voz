@@ -13,7 +13,9 @@ faster-whisper
 nvidia-cublas-cu12
 nvidia-cudnn-cu12==9.*
 
+# Fase 5: cliente del LLM local (además, instalar Ollama: winget install Ollama.Ollama).
+ollama
+
 # Fases siguientes (no instalar todavía):
 # silero-vad          # fase 4: fin de frase en streaming (si el de faster-whisper no basta)
 # openwakeword       # fase 4: palabra de activación
-# ollama              # fase 5: cliente del LLM local
