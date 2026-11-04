@@ -366,6 +366,58 @@ que solo necesita un nuevo productor de `Activar()`.
 
 ---
 
+## 2026-11-04 — Fase 4 (paso A): "Oye Numa"
+
+**Objetivo:** activar el asistente con la voz, con una palabra en español.
+
+**Hecho:**
+- Decisiones mías: frase "Oye Numa"; detector provisional con VAD + Whisper
+  (paso A) y openWakeWord más adelante (paso B); orden directa si va detrás
+  de "Numa"; detector en pausa fuera de REPOSO; pitido; Enter y voz
+  conviven. Código de Claude, explicado paso a paso. ADR 0005 (propuesta).
+- `experimentos/probar_numa.py`: con mi voz, "Oye Numa" 7/7, órdenes en un
+  tirón separadas bien, 0 falsos positivos en una frase normal.
+- `asistente/activacion.py`: hilo productor que segmenta el audio continuo,
+  transcribe con el MISMO Whisper y publica `Activar()` o `Frase(orden)`.
+- `Voz.pitar()`; `OidoWhisper.transcribir()` público; `--sin-numa`.
+- Probado: "Oye Numa" → bip → orden → respuesta; "Oye Numa, cuéntame un
+  chiste" → respuesta directa. Tests: 75/75.
+
+**Aprendido:**
+- Wake word: modelo diminuto que escucha siempre y solo dice "¿me han
+  llamado?". Dos errores opuestos: falsos rechazos y falsos positivos.
+- openWakeWord solo entrena en inglés (datos sintéticos de un TTS inglés)
+  y solo en Linux. Truco: pronunciación aproximada ("noo-mah").
+- Palabras cortas = más falsos positivos; "Numa" se parece a "una",
+  "luna", "nunca"… → "Oye Numa".
+- `hotwords` sesga a Whisper hacia palabras que no conoce: sin pista,
+  "Oye Numa" salía "¿O tiene número?". Con orden detrás acierta sin pista:
+  el contexto ayuda.
+- Con Whisper, "Oye Numa, <orden>" sale gratis en un turno; openWakeWord
+  solo detecta, no transcribe.
+- Compartir el modelo entre hilos: no cargar Whisper dos veces (VRAM).
+- Check-then-act: comprobar la bandera al grabar Y antes de publicar,
+  porque transcribir tarda ~600 ms y el mundo cambia entre medias.
+- Cada productor decide su política de fallo según lo esencial que sea:
+  sin teclado → Salir(); sin detector → seguir con Enter.
+- Dobles de test: un VAD falso por volumen basta para probar `segmentar`;
+  solo tiene que respetar el contrato, no la implementación.
+- `` en la regex: "numérico" no activa.
+- Pitido sin chasquidos: rampas de 10 ms al principio y al final.
+- Escapes anidados: escribir código desde otro programa puede convertir
+  un `
+` en un salto de línea real.
+
+**Problemas / dudas:**
+- Falsos positivos con tele/conversación: sin medir todavía.
+- Whisper transcribe todo lo que se habla en REPOSO: GPU continua.
+- Dos grabaciones simultáneas del micro: bien en Windows (MME); ¿y en Linux?
+
+**Siguiente:** aceptar el ADR 0005; decidir entre paso B (openWakeWord) o
+fase 5 (LLM local con Ollama).
+
+---
+
 ## AAAA-MM-DD — Título
 
 **Objetivo:**
