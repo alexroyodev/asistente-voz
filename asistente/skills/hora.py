@@ -63,7 +63,7 @@ def decir_hora(hora: int, minuto: int) -> str:
 
 class HoraSkill(Skill):
     nombre = "hora"
-    descripcion = "Dice la hora actual."
+    descripcion = "Decir la hora actual, o responder algo que dependa de ella (¿llego tarde?)."
     patrones = (
         r"\bque hora es\b",
         r"\bdime la hora\b",

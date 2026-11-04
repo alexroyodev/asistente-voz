@@ -4,8 +4,9 @@ Cualquier skill nueva hereda de `Skill`, declara sus patrones e implementa
 `ejecutar`. El núcleo nunca necesita saber qué hace cada skill por dentro:
 solo le pasa una `Peticion` y recibe una `Respuesta`.
 
-Pista para la fase 5: este mismo contrato (nombre + descripción + parámetros)
-es casi exactamente lo que un LLM necesita para usar tus skills como "tools".
+Fase 5: este mismo contrato (nombre + descripción + parámetros) es lo que el
+LLM recibe para elegir skill cuando ninguna regex encaja (ver asistente/cerebro.py).
+Por eso `descripcion` va dirigida al LLM: di cuándo usar la skill, con ejemplos.
 """
 from __future__ import annotations
 
@@ -18,8 +19,9 @@ class Peticion:
     """Lo que el usuario ha pedido, ya convertido a texto."""
 
     texto: str
-    # Datos extraídos del texto por el router (grupos con nombre de la regex),
-    # por ejemplo {"cantidad": "5", "unidad": "minutos"}.
+    # Datos extraídos del texto: por el router (grupos con nombre de la regex)
+    # o por el LLM (según `parametros`). Siempre texto, venga de donde venga:
+    # {"cantidad": "5", "unidad": "minuto"}.
     entidades: dict[str, str] = field(default_factory=dict)
 
 
@@ -38,6 +40,10 @@ class Skill(ABC):
     # normalizado (minúsculas, sin tildes). Usa grupos con nombre (?P<x>...)
     # para extraer entidades.
     patrones: tuple[str, ...] = ()
+    # Entidades que la skill necesita, en JSON Schema, para que el LLM sepa
+    # extraerlas: {"cantidad": {"type": "integer"}, ...}. Todas obligatorias.
+    # Deben llamarse igual que los grupos con nombre de `patrones`.
+    parametros: dict[str, dict] = {}
 
     @abstractmethod
     def ejecutar(self, peticion: Peticion) -> Respuesta:

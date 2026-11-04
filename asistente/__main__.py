@@ -5,6 +5,8 @@ Ejecuta con:  python -m asistente                    (micrófono + Piper)
               python -m asistente --texto            (imprime en vez de hablar)
               python -m asistente --whisper small    (otro modelo de Whisper)
               python -m asistente --sin-numa         (solo Enter, sin "Oye Numa")
+              python -m asistente --sin-llm          (solo reglas, sin Ollama)
+              python -m asistente --llm qwen3:4b     (otro modelo de Ollama)
 Con -v verás los cambios de estado y cuánto tarda cada paso.
 
 Arquitectura (ver ADR 0004): productor-consumidor.
@@ -22,6 +24,7 @@ import time
 from pathlib import Path
 
 from asistente.activacion import iniciar_activacion
+from asistente.cerebro import MODELO_POR_DEFECTO, Cerebro, ClienteLLM
 from asistente.entrada import iniciar_entrada
 from asistente.estado import Estado, MaquinaEstados
 from asistente.eventos import Activar, Aviso, Evento, Frase, Salir
@@ -54,6 +57,23 @@ def crear_oido(log: logging.Logger) -> Oido | None:
     return oido
 
 
+def crear_llm(log: logging.Logger) -> ClienteLLM | None:
+    """El LLM es opcional: si Ollama no está, el asistente sigue sin él (ADR 0006)."""
+    if "--sin-llm" in sys.argv:
+        return None
+    modelo = opcion("--llm", MODELO_POR_DEFECTO)
+    inicio = time.perf_counter()
+    try:
+        llm = ClienteLLM(modelo)
+        llm.precargar()  # ~6 s ahora, en vez de en la primera pregunta
+    except Exception as e:
+        print(f"Aviso: sigo sin LLM ({modelo}): {e}\n"
+              "  ¿Está Ollama en marcha? ¿Hiciste `ollama pull " + modelo + "`?")
+        return None
+    log.debug("LLM %s cargado en %.0f ms", modelo, (time.perf_counter() - inicio) * 1000)
+    return llm
+
+
 def crear_voz(log: logging.Logger) -> Voz:
     if "--texto" in sys.argv:
         return VozTexto()
@@ -83,9 +103,16 @@ def esperar_evento(cola: queue.Queue[Evento]) -> Evento:
             continue
 
 
-def pensar(router: Router, texto: str, log: logging.Logger) -> str:
-    """Router + skill: de una frase a la respuesta. Nunca lanza."""
+def pensar(router: Router, cerebro: Cerebro | None, texto: str,
+           log: logging.Logger) -> str:
+    """Regex primero (0 ms, nunca falla); si no encaja, el LLM. Nunca lanza."""
     resultado = router.resolver(texto)
+    if resultado is None and cerebro is not None:
+        inicio = time.perf_counter()
+        resultado = cerebro.resolver(texto)
+        log.debug("El LLM ha elegido %s en %.0f ms",
+                  resultado[0].nombre if resultado else None,
+                  (time.perf_counter() - inicio) * 1000)
     if resultado is None:
         return "Lo siento, todavía no sé hacer eso."
     skill, peticion = resultado
@@ -110,7 +137,11 @@ def main() -> None:
     oido = crear_oido(log)
     cola: queue.Queue[Evento] = queue.Queue()
     # Productor: el temporizador (en su hilo) solo publica; hablará este hilo.
-    router = Router(cargar_skills(avisar=lambda texto: cola.put(Aviso(texto))))
+    llm = crear_llm(log)
+    skills = cargar_skills(avisar=lambda texto: cola.put(Aviso(texto)),
+                           charlar=llm.charlar if llm else None)
+    router = Router(skills)
+    cerebro = Cerebro(llm, skills) if llm else None
     iniciar_entrada(cola, con_texto=oido is None)
 
     # El detector de "Oye Numa" solo escucha cuando este hilo le da paso
@@ -134,7 +165,7 @@ def main() -> None:
             return False
         inicio = time.perf_counter()
         maquina.transicionar(Estado.PENSANDO)
-        respuesta = pensar(router, texto, log)
+        respuesta = pensar(router, cerebro, texto, log)
         # decir() bloquea: medir al final incluiría la duración del audio.
         log.debug("Pensado en %.0f ms", (time.perf_counter() - inicio) * 1000)
         maquina.transicionar(Estado.HABLANDO)
@@ -176,6 +207,10 @@ def main() -> None:
         except KeyboardInterrupt:
             seguir = False
     print()
+    # Lo hace el hilo principal, no un finally de un hilo daemon (que no
+    # se ejecutaría al salir: ver "hilos daemon" en el diario).
+    if llm is not None:
+        llm.descargar()
 
 
 if __name__ == "__main__":

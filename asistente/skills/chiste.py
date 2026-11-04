@@ -22,7 +22,7 @@ CHISTES = (
 
 class ChisteSkill(Skill):
     nombre = "chiste"
-    descripcion = "Cuenta un chiste corto."
+    descripcion = "Contar un chiste: quiere reírse, que le animes o un chiste."
     patrones = (r"\bchistes?\b", r"\bhazme reir\b")
 
     def __init__(self, chistes=CHISTES, aleatorio: random.Random | None = None) -> None:

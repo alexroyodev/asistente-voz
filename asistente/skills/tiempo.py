@@ -36,7 +36,8 @@ def pedir_json(url: str, timeout: float = 5.0) -> dict:
 
 class TiempoSkill(Skill):
     nombre = "tiempo"
-    descripcion = "Dice el tiempo que hace ahora."
+    descripcion = ("El tiempo meteorológico de ahora: temperatura, lluvia, frío, calor, "
+                   "si hace falta paraguas o abrigo.")
     patrones = (r"\bque tiempo hace\b", r"\b(va a llover|hace frio|hace calor)\b")
 
     def __init__(self, obtener=pedir_json) -> None:

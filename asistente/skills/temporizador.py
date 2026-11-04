@@ -15,11 +15,17 @@ SEGUNDOS_POR_UNIDAD = {"segundo": 1, "minuto": 60, "hora": 3600}
 
 class TemporizadorSkill(Skill):
     nombre = "temporizador"
-    descripcion = "Pone un temporizador de N segundos, minutos u horas."
-    # Ya extrae las entidades "cantidad" y "unidad". Pruébalo en el test.
+    descripcion = ("Avisar cuando pase un tiempo: temporizador, alarma, "
+                   "'avísame dentro de…'. Rellena cantidad y unidad.")
+    # La regex extrae "cantidad" y "unidad"; `parametros` le dice al LLM que
+    # extraiga las mismas, con los mismos nombres.
     patrones = (
         r"temporizador de (?P<cantidad>\d+) (?P<unidad>segundo|minuto|hora)s?",
     )
+    parametros = {
+        "cantidad": {"type": "integer", "minimum": 1},
+        "unidad": {"type": "string", "enum": list(SEGUNDOS_POR_UNIDAD)},
+    }
 
     def __init__(self, avisar=print) -> None:
         # `avisar` es la función que se llama al terminar. Hoy es print;
