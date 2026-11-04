@@ -72,7 +72,7 @@ Prueba: "¿qué hora es?", "pon un temporizador de 10 segundos",
 | `asistente/eventos.py` | Tipos de evento: `Activar`, `Frase`, `Aviso`, `Salir` |
 | `asistente/entrada.py` | Hilo productor: teclado → eventos |
 | `asistente/estado.py` | Máquina de estados |
-| `asistente/oido.py` | Contrato `Oido`: `OidoTeclado` y `OidoWhisper` |
+| `asistente/oido.py` | Contrato `Oido`: `OidoWhisper` (micrófono + VAD + Whisper) |
 | `asistente/router.py` | Elige la skill para cada frase |
 | `asistente/voz.py` | Contrato `Voz`: `VozTexto` y `VozPiper` |
 | `asistente/skills/` | Habilidades; `base.py` es el contrato |
