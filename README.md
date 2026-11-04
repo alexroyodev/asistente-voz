@@ -15,8 +15,9 @@ micrófono → wake word → VAD → voz a texto → router / LLM → skills →
 Hoy (fase 4): dices «Oye Numa» (o pulsas Enter), hablas, y el asistente responde.
 
 ```
-micrófono → VAD (fin de frase) → Whisper → router → skill → Voz (Piper) → altavoz
-   └─────────────── Oido ──────────────┘                    └──── Voz ────┘
+micrófono → VAD (fin de frase) → Whisper → router ─┬─▶ skill → Voz (Piper) → altavoz
+   └─────────────── Oido ──────────────┘    (regex) │      ▲         └──── Voz ────┘
+                                     no encaja ──▶ LLM ────┘  (Ollama, llama3.2:3b)
                          └──────────── máquina de estados ────────────┘
 ```
 
@@ -42,6 +43,9 @@ python -m piper.download_voices es_ES-davefx-medium --data-dir modelos
 python -m pytest
 ```
 
+El LLM necesita Ollama (`winget install Ollama.Ollama`) y el modelo:
+`ollama pull llama3.2:3b`. Sin Ollama, el asistente funciona solo con reglas.
+
 Whisper necesita una GPU NVIDIA (CUDA 12). Las DLL de cuBLAS y cuDNN se
 instalan con `requirements.txt`; el modelo se descarga solo la primera vez
 (~1,6 GB `turbo`, ~480 MB `small`). Para ver el progreso:
@@ -59,11 +63,15 @@ python -m asistente --texto            # imprime en vez de hablar
 python -m asistente --teclado --texto  # como la fase 1 (sin modelos)
 python -m asistente --whisper small    # Whisper más ligero (menos VRAM)
 python -m asistente --sin-numa         # solo Enter (no escucha «Oye Numa»)
+python -m asistente --sin-llm          # solo reglas, sin Ollama
+python -m asistente --llm qwen3:4b     # otro modelo de Ollama
 python -m asistente -v                 # muestra estados y latencias
 ```
 
 Prueba: "Oye Numa, ¿qué hora es?" (o "Oye Numa", bip, y la orden), "pon un temporizador de 10 segundos",
-"¿qué tiempo hace?", "cuéntame un chiste". Di `salir` para terminar.
+"¿qué tiempo hace?", "cuéntame un chiste". Con LLM también: "¿necesito
+paraguas?", "avísame en media hora", "¿cuál es la capital de Francia?".
+Di `salir` para terminar.
 
 ## Estructura
 
@@ -75,7 +83,8 @@ Prueba: "Oye Numa, ¿qué hora es?" (o "Oye Numa", bip, y la orden), "pon un tem
 | `asistente/activacion.py` | Hilo productor: «Oye Numa» → eventos (VAD + Whisper) |
 | `asistente/estado.py` | Máquina de estados |
 | `asistente/oido.py` | Contrato `Oido`: `OidoWhisper` (micrófono + VAD + Whisper) |
-| `asistente/router.py` | Elige la skill para cada frase |
+| `asistente/router.py` | Elige la skill para cada frase (regex: vía rápida) |
+| `asistente/cerebro.py` | Elige la skill con el LLM si la regex no encaja |
 | `asistente/voz.py` | Contrato `Voz`: `VozTexto` y `VozPiper` |
 | `asistente/skills/` | Habilidades; `base.py` es el contrato |
 | `experimentos/` | Pruebas sueltas de librerías, fuera del asistente |
@@ -92,7 +101,7 @@ Prueba: "Oye Numa, ¿qué hora es?" (o "Oye Numa", bip, y la orden), "pon un tem
 | 2 | Salida de voz con Piper | ✅ |
 | 3 | Entrada de voz con faster-whisper + VAD (pulsar para hablar) | ✅ (afinando) |
 | 4 | Palabra de activación «Oye Numa» (A: Whisper ✅ · B: openWakeWord) | ⏳ |
-| 5 | Cerebro con LLM local (Ollama + tool calling) | |
+| 5 | Cerebro con LLM local (Ollama + salida estructurada) | ✅ |
 | 6 | Pulido: interrupciones, latencia, memoria corta | |
 | 7 | Satélite (Raspberry Pi) + servidor | |
 
@@ -108,3 +117,4 @@ Prueba: "Oye Numa, ¿qué hora es?" (o "Oye Numa", bip, y la orden), "pon un tem
 - [x] Probar otras voces de Piper en español (me quedo con davefx).
 - [ ] Revisar y aceptar el ADR 0005 («Oye Numa»).
 - [ ] Medir falsos positivos de «Oye Numa» con tele o conversación.
+- [ ] Revisar y aceptar el ADR 0006 (cerebro con LLM).

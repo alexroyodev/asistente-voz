@@ -418,6 +418,64 @@ fase 5 (LLM local con Ollama).
 
 ---
 
+## 2026-11-04 — Fase 5: Numa tiene cerebro (LLM local)
+
+**Objetivo:** entender frases que no encajan en las regex y poder conversar.
+
+**Hecho:**
+- Ollama + llama3.2:3b. Experimentos comparando modelos y enfoques
+  (`experimentos/probar_ollama.py`), ADR 0006 (propuesta).
+- Decisiones mías: regex primero y LLM si no encaja; el LLM conversa con
+  prudencia; cada skill declara sus parámetros; sin Ollama, se sigue sin LLM.
+  Código de Claude, explicado paso a paso.
+- `Skill.parametros`; `cerebro.py` (esquema, instrucciones, validación,
+  `ClienteLLM`, `Cerebro`); `ConversarSkill`; `--sin-llm`, `--llm`.
+- Probado por voz: paraguas → tiempo, capital de Francia → París, gracias →
+  "Buenos días…". "Temporizador de 5 minutos" fue por regex (Whisper
+  escribe cifras). Tests: 93/93.
+
+**Aprendido:**
+- LLM: predice el siguiente token. Ollama lo sirve en local; Q4 = pesos de
+  4 bits. `num_ctx` (tamaño de la caché) decide si cabe en la GPU: con 2048,
+  llama3.2:3b cabe al 100 %; con 4096, al 80 % (y lo que va a CPU es lento).
+- Tool calling con modelos pequeños: abusan de las tools ("hora" para la
+  capital de Portugal) o, con una tool "conversar", dejan de usarlas y se
+  inventan datos ("parece que lloverá"). 5/7 y 8/10.
+- **Salida estructurada** (JSON Schema con un `enum` de intenciones): 10/10,
+  330-450 ms. Al modelo pequeño se le da mejor clasificar que decidir si actuar.
+- Un 3B sabe poco y se equivoca con seguridad: "una araña tiene seis patas",
+  incluso con instrucciones de prudencia.
+- Validar SIEMPRE lo que genera un LLM: `cantidad: null` cumple el esquema
+  y no tiene sentido; `isinstance(True, int)` es True.
+- `conversar` como skill sin patrones: polimorfismo del contrato Skill.
+- Las descripciones de las skills son comportamiento, no documentación.
+- Comprobar hipótesis antes de "arreglar": "Me quiero fumar un porro" →
+  chiste. Pensé que era la descripción; la cambié, medí, y no: es el modelo.
+  Se deja como está.
+- Un `enum` cerrado obliga a elegir siempre algo: `conversar` es la red de
+  seguridad para lo raro.
+- Ollama es OTRO proceso: con keep_alive=-1 retenía 2,3 GB de VRAM tras
+  cerrar el asistente. Hay que descargarlo al salir (desde el hilo principal).
+- `cmd | tail` oculta errores (el código de salida es el de tail):
+  `set -o pipefail`. Otra vez escapes rotos al escribir código desde código.
+
+**Latencias medidas:**
+- llama3.2:3b (ctx 2048, 100 % GPU): clasificar 400-550 ms; conversar,
+  otra llamada (~400-800 ms). Carga ~5 s al arrancar.
+- VRAM con todo (Whisper turbo + LLM + detector): ~3,2 GB de 4.
+- Percibida por la vía LLM: ~0,8 s silencio + ~0,6 s Whisper + ~0,5 s LLM
+  (+ red o 2ª llamada) + Piper ≈ 2-2,5 s.
+
+**Problemas / dudas:**
+- Alucinaciones del 3B en cultura general (riesgo asumido).
+- "Me quiero fumar un porro" → chiste (rareza del modelo).
+- No probé aún "Oye Numa, <orden>" de un tirón con frases que van al LLM.
+
+**Siguiente:** aceptar el ADR 0006; fase 6 (interrupciones, latencia,
+memoria corta) o paso B de la fase 4 (openWakeWord).
+
+---
+
 ## AAAA-MM-DD — Título
 
 **Objetivo:**
