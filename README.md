@@ -103,4 +103,4 @@ Prueba: "¿qué hora es?", "pon un temporizador de 10 segundos",
 - [ ] Ajustar el silencio de fin de frase (las pausas cortan la frase).
 - [x] Eco: que los avisos del temporizador pasen por el bucle principal.
 - [x] Revisar y aceptar el ADR 0004 (bucle de eventos).
-- [ ] Probar otras voces de Piper en español.
+- [x] Probar otras voces de Piper en español (me quedo con davefx).

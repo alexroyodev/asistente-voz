@@ -354,6 +354,16 @@ asistente escucha (eco).
 **Siguiente:** revisar ADR 0003 y 0004; fase 4 (palabra de activación),
 que solo necesita un nuevo productor de `Activar()`.
 
+### Añadido: ADR y voces
+
+- ADR 0003 y 0004 aceptados.
+- `experimentos/probar_voces.py`: misma frase con todas las voces en español
+  (descarga las que falten, prueba cada hablante, ajusta velocidad y variación).
+- Probadas varias; ninguna me convence más: **me quedo con `davefx`**.
+- Aprendido: la calidad (x_low…high) es el tamaño del modelo; como Piper va
+  en CPU, una voz mejor no quita VRAM. Una entonación demasiado regular da
+  sensación de "valle inquietante".
+
 ---
 
 ## AAAA-MM-DD — Título
