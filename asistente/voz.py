@@ -49,6 +49,13 @@ class Voz(ABC):
         terminara justo lo que quiere cortar.
         """
 
+    def pitar(self) -> None:
+        """Señal corta de "te escucho" (tras "Oye Numa"). Por defecto, nada.
+
+        Bloquea hasta que termina: así el micrófono, que se abre justo
+        después, no graba el propio pitido.
+        """
+
 
 class VozTexto(Voz):
     """Imprime en vez de hablar. Para tests y para usar sin altavoz."""
@@ -56,6 +63,10 @@ class VozTexto(Voz):
     def decir(self, texto: str) -> None:
         with self._lock:
             print(texto)
+
+    def pitar(self) -> None:
+        with self._lock:
+            print("  🔔")
 
 
 class VozPiper(Voz):
@@ -88,7 +99,32 @@ class VozPiper(Voz):
                 self._sd.play(audio, chunk.sample_rate)
                 self._sd.wait()
 
+    def pitar(self) -> None:
+        with self._lock:
+            self._sd.play(tono(), FRECUENCIA_PITIDO)
+            self._sd.wait()
+
     def parar(self) -> None:
         # Sin lock (ver Voz.parar): marca el corte y detiene el audio actual.
         self._cortar.set()
         self._sd.stop()
+
+
+FRECUENCIA_PITIDO = 22_050
+
+
+def tono(hz: float = 880.0, segundos: float = 0.15, volumen: float = 0.3):
+    """Un "bip": onda senoidal con subida y bajada suaves.
+
+    Sin las rampas, el sonido empezaría y acabaría de golpe y se oiría un
+    chasquido (un salto brusco de la onda es, para el oído, un "clic").
+    """
+    import numpy as np
+
+    t = np.arange(int(segundos * FRECUENCIA_PITIDO)) / FRECUENCIA_PITIDO
+    onda = np.sin(2 * np.pi * hz * t)
+    rampa = int(0.01 * FRECUENCIA_PITIDO)  # 10 ms
+    envolvente = np.ones_like(onda)
+    envolvente[:rampa] = np.linspace(0, 1, rampa)
+    envolvente[-rampa:] = np.linspace(1, 0, rampa)
+    return (onda * envolvente * volumen).astype(np.float32)

@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from asistente.voz import Voz, VozTexto
+from asistente.voz import Voz, VozTexto, tono
 
 
 def test_voz_es_abstracta():
@@ -46,3 +46,15 @@ def test_dos_hilos_no_se_pisan():
     # Cada "inicio" va seguido de SU "fin": nunca inicio a, inicio b, ...
     for i in range(0, 4, 2):
         assert voz.eventos[i].split()[1] == voz.eventos[i + 1].split()[1]
+
+
+def test_pitar_en_texto(capsys):
+    VozTexto().pitar()
+    assert "🔔" in capsys.readouterr().out
+
+
+def test_tono_sin_chasquidos():
+    onda = tono()
+    assert onda.dtype.name == "float32"
+    assert abs(onda[0]) < 0.01 and abs(onda[-1]) < 0.01  # empieza y acaba en silencio
+    assert abs(onda).max() <= 0.3 + 1e-6                  # respeta el volumen

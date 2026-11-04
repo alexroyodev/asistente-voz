@@ -97,18 +97,30 @@ class OidoWhisper(Oido):
 
     def escuchar(self) -> str | None:
         audio = self._grabar_hasta_silencio()
-        if audio is None or len(audio) / FRECUENCIA < DURACION_MIN_S:
+        if audio is None:
             return None
+        texto = self.transcribir(audio)
+        if texto:
+            print(f"  🎙  {texto}")
+        return texto
 
+    def transcribir(self, audio: np.ndarray, pista: str | None = None) -> str | None:
+        """Audio (16 kHz, float32) → texto fiable, o None.
+
+        Público para que el detector de "Oye Numa" use ESTE mismo modelo:
+        cargar Whisper dos veces gastaría el doble de VRAM. Lo pueden llamar
+        dos hilos a la vez: CTranslate2 lo permite.
+        `pista` sesga a Whisper hacia palabras que no conoce ("Numa").
+        """
+        if len(audio) / FRECUENCIA < DURACION_MIN_S:
+            return None
         inicio = time.perf_counter()
         segmentos, _ = self._whisper.transcribe(
-            audio, language="es", beam_size=1, vad_filter=True,
+            audio, language="es", beam_size=1, vad_filter=True, hotwords=pista,
         )
         texto = texto_fiable(segmentos)  # aquí se transcribe (es un generador)
         log.debug("Transcrito en %.0f ms: %r",
                   (time.perf_counter() - inicio) * 1000, texto)
-        if texto:
-            print(f"  🎙  {texto}")
         return texto
 
     def _grabar_hasta_silencio(self) -> np.ndarray | None:

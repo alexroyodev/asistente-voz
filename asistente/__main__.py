@@ -4,6 +4,7 @@ Ejecuta con:  python -m asistente                    (micrófono + Piper)
               python -m asistente --teclado          (escribes en vez de hablar)
               python -m asistente --texto            (imprime en vez de hablar)
               python -m asistente --whisper small    (otro modelo de Whisper)
+              python -m asistente --sin-numa         (solo Enter, sin "Oye Numa")
 Con -v verás los cambios de estado y cuánto tarda cada paso.
 
 Arquitectura (ver ADR 0004): productor-consumidor.
@@ -16,9 +17,11 @@ from __future__ import annotations
 import logging
 import queue
 import sys
+import threading
 import time
 from pathlib import Path
 
+from asistente.activacion import iniciar_activacion
 from asistente.entrada import iniciar_entrada
 from asistente.estado import Estado, MaquinaEstados
 from asistente.eventos import Activar, Aviso, Evento, Frase, Salir
@@ -109,7 +112,19 @@ def main() -> None:
     # Productor: el temporizador (en su hilo) solo publica; hablará este hilo.
     router = Router(cargar_skills(avisar=lambda texto: cola.put(Aviso(texto))))
     iniciar_entrada(cola, con_texto=oido is None)
-    prompt = "> " if oido is None else "[Enter para hablar] "
+
+    # El detector de "Oye Numa" solo escucha cuando este hilo le da paso
+    # (en REPOSO): nunca se activa con la voz de Piper ni con tu orden.
+    escuchando_numa = threading.Event()
+    con_numa = oido is not None and "--sin-numa" not in sys.argv
+    if con_numa:
+        iniciar_activacion(cola, oido.transcribir, escuchando_numa)  # mismo Whisper
+    if oido is None:
+        prompt = "> "
+    elif con_numa:
+        prompt = "[Di «Oye Numa» o pulsa Enter] "
+    else:
+        prompt = "[Enter para hablar] "
 
     def responder(texto: str) -> bool:
         """PENSANDO → HABLANDO → REPOSO. Devuelve False si hay que salir."""
@@ -133,13 +148,19 @@ def main() -> None:
         # Solo se imprime el prompt cuando de verdad estamos listos (REPOSO).
         print(prompt, end="", flush=True)
         try:
+            escuchando_numa.set()      # REPOSO: el detector puede escuchar
             evento = esperar_evento(cola)
+            escuchando_numa.clear()    # atendemos el evento: el detector, en pausa
             log.debug("Evento: %r", evento)
             match evento:
-                case Frase(texto=texto):           # ⑦ teclado: REPOSO → PENSANDO
+                case Frase(texto=texto):           # ⑦ teclado u "Oye Numa, <orden>"
+                    if oido is not None:           # con micro, una Frase viene de la voz
+                        print()  # el prompt ya estaba impreso
+                        print(f"  🎙  {texto}")
                     seguir = responder(texto)
-                case Activar():                    # ① micrófono
+                case Activar():                    # ① Enter u "Oye Numa" a secas
                     maquina.transicionar(Estado.ESCUCHANDO)
+                    voz.pitar()                    # bloquea: el micro no graba el bip
                     texto = oido.escuchar()
                     if texto is None:              # ② no se entendió nada
                         maquina.transicionar(Estado.REPOSO)
