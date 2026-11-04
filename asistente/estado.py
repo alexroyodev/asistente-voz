@@ -5,8 +5,12 @@ la definimos completa desde ya: cuando lleguen el audio y la palabra de
 activación, este archivo será el corazón del sistema.
 
     REPOSO ──(wake word)──▶ ESCUCHANDO ──(fin de frase)──▶ PENSANDO
-       ▲                                                      │
-       └──────────(fin del audio)── HABLANDO ◀──(respuesta)───┘
+       ▲  │                                                   │
+       │  └──────(aviso proactivo)──▶ HABLANDO ◀──(respuesta)─┘
+       └──────────(fin del audio)───────┘
+
+Solo el hilo principal llama a transicionar() (ver asistente/eventos.py),
+así que no necesita Lock.
 """
 from __future__ import annotations
 
@@ -25,7 +29,8 @@ class Estado(Enum):
 
 # Transiciones permitidas: desde cada estado, a cuáles se puede ir.
 TRANSICIONES: dict[Estado, set[Estado]] = {
-    Estado.REPOSO: {Estado.ESCUCHANDO, Estado.PENSANDO},  # PENSANDO: atajo del modo texto
+    # PENSANDO: atajo del modo texto. HABLANDO: aviso proactivo (temporizador).
+    Estado.REPOSO: {Estado.ESCUCHANDO, Estado.PENSANDO, Estado.HABLANDO},
     Estado.ESCUCHANDO: {Estado.PENSANDO, Estado.REPOSO},  # REPOSO: no se entendió nada
     Estado.PENSANDO: {Estado.HABLANDO, Estado.REPOSO},
     Estado.HABLANDO: {Estado.REPOSO, Estado.ESCUCHANDO},  # ESCUCHANDO: interrupción (fase 6)

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
-from asistente.oido import Oido, OidoTeclado, fin_de_frase, texto_fiable
+from asistente.oido import Oido, fin_de_frase, texto_fiable
 
 # Una ventana de Silero son 32 ms: 0,8 s de silencio = 25 ventanas.
 VOZ, SILENCIO = 0.9, 0.05
@@ -15,16 +15,6 @@ VOZ, SILENCIO = 0.9, 0.05
 def test_oido_es_abstracto():
     with pytest.raises(TypeError):
         Oido()
-
-
-def test_teclado_devuelve_texto(monkeypatch):
-    monkeypatch.setattr("builtins.input", lambda _: "  que hora es  ")
-    assert OidoTeclado().escuchar() == "que hora es"
-
-
-def test_teclado_vacio_es_none(monkeypatch):
-    monkeypatch.setattr("builtins.input", lambda _: "   ")
-    assert OidoTeclado().escuchar() is None
 
 
 # --- Fin de frase ---------------------------------------------------------

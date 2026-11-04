@@ -56,8 +56,15 @@ def test_transicion_valida():
 
 def test_transicion_invalida():
     m = MaquinaEstados()
+    m.transicionar(Estado.ESCUCHANDO)
     with pytest.raises(TransicionInvalida):
-        m.transicionar(Estado.HABLANDO)  # de REPOSO no se puede hablar directamente
+        m.transicionar(Estado.HABLANDO)  # no se responde sin haber pensado
+
+
+def test_aviso_proactivo_reposo_a_hablando():
+    m = MaquinaEstados()
+    m.transicionar(Estado.HABLANDO)  # temporizador: habla sin que le pregunten
+    assert m.estado is Estado.HABLANDO
 
 
 # --- Skills ---------------------------------------------------------------
@@ -145,3 +152,15 @@ def test_chiste_con_duplicados_no_se_cuelga():
     # con duplicados (len > 1 pero un solo valor distinto) era un bucle infinito.
     skill = ChisteSkill(chistes=("igual", "igual"))
     assert [skill.ejecutar(Peticion("chiste")).texto for _ in range(3)] == ["igual"] * 3
+
+
+def test_temporizador_publica_aviso_en_la_cola():
+    # Cableado del paso 4: el temporizador no habla, publica un Aviso.
+    import queue
+    from asistente.eventos import Aviso
+
+    cola = queue.Queue()
+    skills = cargar_skills(avisar=lambda texto: cola.put(Aviso(texto)))
+    skill, peticion = Router(skills).resolver("temporizador de 1 segundo")
+    skill.ejecutar(peticion)
+    assert cola.get(timeout=2) == Aviso("¡Tiempo! Han pasado 1 segundo.")

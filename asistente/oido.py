@@ -1,9 +1,12 @@
 """Entrada del asistente (fase 3): el espejo de `voz.py`.
 
 El núcleo solo conoce el contrato `Oido`:
-  - OidoTeclado: lee lo que escribes (como en la fase 1).
-  - OidoWhisper: Enter para empezar, hablas, y para solo cuando el VAD
-    detecta que te has callado. Transcribe con faster-whisper.
+  - OidoWhisper: graba desde que se le llama hasta que el VAD detecta que te
+    has callado, y transcribe con faster-whisper.
+
+Quién decide CUÁNDO escuchar no es el Oido: es el evento Activar() (Enter
+hoy, palabra de activación en la fase 4). Ver asistente/entrada.py.
+Con --teclado no hay Oido: el texto llega ya hecho en un evento Frase.
 
 Decisiones (ver ADR 0003):
   - `escuchar()` BLOQUEA hasta tener una frase y devuelve `str | None`.
@@ -45,12 +48,6 @@ class Oido(ABC):
         """
 
 
-class OidoTeclado(Oido):
-    def escuchar(self) -> str | None:
-        texto = input("> ").strip()  # EOF / Ctrl+C se propagan al bucle
-        return texto or None
-
-
 # --- Funciones puras: la lógica de decisión, testeable sin micrófono -----
 
 def fin_de_frase(probabilidades: np.ndarray, umbral: float = UMBRAL_VOZ,
@@ -89,7 +86,7 @@ def _preparar_dlls_cuda() -> None:
 class OidoWhisper(Oido):
     def __init__(self, modelo: str = "turbo") -> None:
         _preparar_dlls_cuda()
-        # Importes aquí: quien use OidoTeclado (y los tests) no los necesita.
+        # Importes aquí: con --teclado (y en los tests) no hacen falta.
         import sounddevice
         from faster_whisper import WhisperModel
         from faster_whisper.vad import get_vad_model
@@ -99,7 +96,6 @@ class OidoWhisper(Oido):
         self._vad = get_vad_model()
 
     def escuchar(self) -> str | None:
-        input("[Enter para hablar] ")
         audio = self._grabar_hasta_silencio()
         if audio is None or len(audio) / FRECUENCIA < DURACION_MIN_S:
             return None
