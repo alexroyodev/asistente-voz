@@ -24,6 +24,7 @@ import time
 from pathlib import Path
 
 from asistente.activacion import iniciar_activacion
+from asistente.interrupcion import iniciar_interrupciones
 from asistente.cerebro import MODELO_POR_DEFECTO, Cerebro, ClienteLLM
 from asistente.entrada import iniciar_entrada
 from asistente.estado import Estado, MaquinaEstados
@@ -147,9 +148,25 @@ def main() -> None:
     # El detector de "Oye Numa" solo escucha cuando este hilo le da paso
     # (en REPOSO): nunca se activa con la voz de Piper ni con tu orden.
     escuchando_numa = threading.Event()
+    # El de interrupciones, solo mientras habla (HABLANDO): ver ADR 0007.
+    hablando = threading.Event()
     con_numa = oido is not None and "--sin-numa" not in sys.argv
     if con_numa:
         iniciar_activacion(cola, oido.transcribir, escuchando_numa)  # mismo Whisper
+        iniciar_interrupciones(cola, oido.transcribir, hablando, voz.parar)
+
+    def hablar(texto: str) -> None:
+        """voz.decir() dejando que el detector de interrupciones escuche.
+
+        Si el detector oye "Oye Numa", llama a voz.parar() desde su hilo:
+        decir() vuelve antes de tiempo y el bucle sigue como si hubiera
+        terminado (HABLANDO → REPOSO). Lo que viene después llega por la cola.
+        """
+        hablando.set()
+        try:
+            voz.decir(texto)
+        finally:
+            hablando.clear()  # aunque decir() falle: si no, escucharía para siempre
     if oido is None:
         prompt = "> "
     elif con_numa:
@@ -169,7 +186,7 @@ def main() -> None:
         # decir() bloquea: medir al final incluiría la duración del audio.
         log.debug("Pensado en %.0f ms", (time.perf_counter() - inicio) * 1000)
         maquina.transicionar(Estado.HABLANDO)
-        voz.decir(respuesta)
+        hablar(respuesta)  # interrumpible
         maquina.transicionar(Estado.REPOSO)
         return True
 
@@ -200,7 +217,7 @@ def main() -> None:
                 case Aviso(texto=texto):           # ⑥ aviso proactivo
                     print()  # el prompt ya estaba impreso: el aviso, en su línea
                     maquina.transicionar(Estado.HABLANDO)
-                    voz.decir(texto)
+                    hablar(texto)  # interrumpible: "Oye Numa, para"
                     maquina.transicionar(Estado.REPOSO)
                 case Salir():
                     seguir = False
