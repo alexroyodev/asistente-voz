@@ -4,6 +4,7 @@ No forma parte del asistente. Ejecuta desde la raíz del proyecto:
 
     python experimentos/probar_interrupcion.py          # con altavoces
     python experimentos/probar_interrupcion.py --nadie  # no digas nada: ¿se activa solo?
+    python experimentos/probar_interrupcion.py --umbral 0   # sin puerta de volumen
 
 Piper lee un texto largo por los altavoces. A la vez, cada 1,5 s se
 transcriben los ÚLTIMOS 2 s del micrófono (ventanas solapadas: no se espera
@@ -31,6 +32,10 @@ import numpy as np  # noqa: E402
 
 VENTANA_S = 2.0   # cuánto audio se transcribe cada vez
 PASO_S = 1.5      # cada cuánto (solape de 0,5 s: "Oye Numa" no cae partido)
+# Puerta de volumen: Piper llega al micro muy débil (RMS medio ~0,0007, pico
+# ~0,01 medido en este portátil); tu voz, mucho más fuerte. Las ventanas por
+# debajo ni se transcriben: con audio débil, la pista hace alucinar "Oye Numa".
+UMBRAL_RMS = 0.005
 TEXTO = (
     "Hoy hace un día estupendo en Madrid, con cielos despejados y una temperatura "
     "máxima de veintidós grados. Por la tarde se esperan algunas nubes, pero no "
@@ -54,6 +59,8 @@ def main() -> None:
     audio = np.concatenate(trozos)
     duracion = len(audio) / 22050
     sin_hablar = "--nadie" in sys.argv
+    umbral = float(sys.argv[sys.argv.index("--umbral") + 1]) if "--umbral" in sys.argv \
+        else UMBRAL_RMS
     print(f"Piper va a hablar {duracion:.0f} s. "
           + ("NO digas nada: medimos si se activa solo." if sin_hablar
              else "Di «Oye Numa» cuando quieras (y apunta el segundo en que lo dices)."))
@@ -75,13 +82,20 @@ def main() -> None:
                 continue
             siguiente += PASO_S
             ventana = np.concatenate(microfono)[-int(VENTANA_S * FRECUENCIA):]
+            # El pico de los 100 ms más fuertes: la media de 2 s diluiría un
+            # "Oye Numa" corto rodeado de murmullo de Piper.
+            nivel = max(float(np.sqrt(np.mean(b ** 2))) for b in np.array_split(ventana, 20))
+            if nivel < umbral:
+                print(f"  {t:5.1f} s · nivel {nivel:.4f} · (por debajo del umbral: no se transcribe)")
+                continue
             t0 = time.perf_counter()
             segmentos, _ = whisper.transcribe(ventana, language="es", beam_size=1,
                                               hotwords=FRASE_ACTIVACION)
             texto = "".join(s.text for s in segmentos).strip()
             ms = (time.perf_counter() - t0) * 1000
             evento = evento_para(texto)
-            print(f"  {t:5.1f} s · {ms:4.0f} ms · {'✅ NUMA' if evento else '      '} {texto!r}")
+            print(f"  {t:5.1f} s · nivel {nivel:.4f} · {ms:4.0f} ms · "
+                  f"{'✅ NUMA' if evento else '      '} {texto!r}")
             if evento is not None:
                 sd.stop()
                 print(f"\n⏹  Piper cortado a los {time.perf_counter() - inicio:.1f} s. "
