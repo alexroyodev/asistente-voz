@@ -303,6 +303,59 @@ eco (los avisos deben pasar por el bucle principal) antes de la fase 4.
 
 ---
 
+## 2026-11-04 — Bucle de eventos: adiós al eco
+
+**Objetivo:** que los avisos del temporizador no hablen mientras el
+asistente escucha (eco).
+
+**Hecho:**
+- Patrón productor-consumidor con `queue.Queue` (ADR 0004, propuesta).
+  Decisiones mías: transición `REPOSO → HABLANDO` para avisos proactivos y
+  que los avisos esperen en la cola. Código de Claude, explicado paso a paso.
+- `eventos.py` (Activar, Frase, Aviso, Salir), `entrada.py` (hilo que
+  convierte Enter/texto en eventos), bucle principal con `match`, y el
+  temporizador publica `Aviso` en vez de hablar.
+- Desaparecen `OidoTeclado` y el `input()` de `OidoWhisper`.
+- Probado con micro: un Enter pulsado durante el aviso espera a que
+  termine; un temporizador que vence mientras pido un chiste suena después.
+- Tests: 58/58.
+
+**Aprendido:**
+- **Productor-consumidor:** los otros hilos no actúan, solo avisan; un único
+  hilo (el principal) habla, escucha, imprime y cambia de estado. El eco
+  queda imposible por construcción, y la máquina de estados ya no necesita Lock.
+- Eventos como dataclasses `frozen=True`: inmutables → se pueden pasar entre
+  hilos sin Lock. Una clase por evento: los errores de nombre saltan al momento.
+- `match`/`case` despacha por tipo y extrae campos: `case Frase(texto=texto)`.
+- `Queue` es segura entre hilos (lleva su Lock dentro) y `get()` duerme sin CPU.
+  En Windows, `get()` sin timeout no deja pasar Ctrl+C → `get(timeout=0.2)`.
+- **Hilos daemon:** Python no los espera al salir y los corta en seco, sin
+  ejecutar ni su `finally`. Útil para hilos imposibles de parar (bloqueados
+  leyendo el teclado); peligroso si tocan recursos compartidos.
+- `input()` coge el lock de stdout: un hilo daemon dentro de `input()` al
+  cerrar provocaba "Fatal Python error". `sys.stdin.readline()` solo lee.
+  Era intermitente: con concurrencia, probar varias veces.
+- Los valores por defecto se evalúan al definir la función: `leer=input`
+  capturó el `input` original y el `monkeypatch` no tuvo efecto.
+  → Inyectar dependencias explícitamente.
+- Las excepciones en un hilo no llegan al principal: el hilo de entrada
+  publica `Salir()` en su `finally` para no dejar el bucle esperando.
+- Cambiar una regla debe romper algún test: `test_transicion_invalida`
+  usaba justo `REPOSO → HABLANDO`. Se cambia el test a sabiendas.
+- La inyección de `avisar` (fase 1) pagó por tercera vez: print →
+  voz.decir → cola.put, sin tocar la skill.
+
+**Problemas / dudas:**
+- La voz `davefx` me da algo de miedo. Hay alternativas en español
+  (sharvard, es_AR-daniela-high, es_MX-claude-high…): probar con calma.
+- Siguen abiertos: el silencio de fin de frase (pausas), modo CPU para
+  Whisper, guardar temporizadores al salir.
+
+**Siguiente:** revisar ADR 0003 y 0004; fase 4 (palabra de activación),
+que solo necesita un nuevo productor de `Activar()`.
+
+---
+
 ## AAAA-MM-DD — Título
 
 **Objetivo:**

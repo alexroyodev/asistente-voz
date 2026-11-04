@@ -23,6 +23,15 @@ micrófono → VAD (fin de frase) → Whisper → router → skill → Voz (Pipe
 El centro (estados, router, skills) no cambia entre fases; lo que cambia son
 los extremos, cada uno detrás de una interfaz propia (`Oido`, `Skill`, `Voz`).
 
+Concurrencia (ADR 0004): bucle de eventos productor-consumidor.
+
+```
+hilo de entrada (Enter / texto) ──▶ Activar / Frase ─┐
+temporizadores                  ──▶ Aviso ───────────┼──▶ [cola] ──▶ hilo principal
+(fase 4: palabra de activación  ──▶ Activar)         ┘    (único que habla, escucha
+                                                           y cambia de estado)
+```
+
 ## Puesta en marcha (Windows, PowerShell)
 
 ```powershell
@@ -59,7 +68,9 @@ Prueba: "¿qué hora es?", "pon un temporizador de 10 segundos",
 
 | Ruta | Qué es |
 |---|---|
-| `asistente/__main__.py` | Bucle principal y elección de voz |
+| `asistente/__main__.py` | Bucle de eventos (consumidor) y arranque |
+| `asistente/eventos.py` | Tipos de evento: `Activar`, `Frase`, `Aviso`, `Salir` |
+| `asistente/entrada.py` | Hilo productor: teclado → eventos |
 | `asistente/estado.py` | Máquina de estados |
 | `asistente/oido.py` | Contrato `Oido`: `OidoTeclado` y `OidoWhisper` |
 | `asistente/router.py` | Elige la skill para cada frase |
@@ -90,4 +101,6 @@ Prueba: "¿qué hora es?", "pon un temporizador de 10 segundos",
 - [x] Fase 3: entrada de voz.
 - [ ] Revisar y aceptar el ADR 0003 (contrato `Oido`).
 - [ ] Ajustar el silencio de fin de frase (las pausas cortan la frase).
-- [ ] Eco: que los avisos del temporizador pasen por el bucle principal.
+- [x] Eco: que los avisos del temporizador pasen por el bucle principal.
+- [ ] Revisar y aceptar el ADR 0004 (bucle de eventos).
+- [ ] Probar otras voces de Piper en español.
