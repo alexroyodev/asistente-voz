@@ -1,6 +1,6 @@
 # ADR 0004: Bucle de eventos con un único hilo dueño del audio y del estado
 
-- **Estado:** propuesta
+- **Estado:** aceptada
 - **Fecha:** 2026-11-04
 
 ## Contexto

@@ -1,6 +1,6 @@
 # ADR 0003: Entrada de voz detrás de un contrato `Oido`, con faster-whisper
 
-- **Estado:** propuesta
+- **Estado:** aceptada
 - **Fecha:** 2026-11-03
 
 ## Contexto

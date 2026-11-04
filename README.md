@@ -99,8 +99,8 @@ Prueba: "¿qué hora es?", "pon un temporizador de 10 segundos",
 - [x] Revisar y aceptar el ADR 0002 (contrato `Voz`).
 - [x] `HoraSkill`: decir la hora como una persona ("las seis menos doce").
 - [x] Fase 3: entrada de voz.
-- [ ] Revisar y aceptar el ADR 0003 (contrato `Oido`).
+- [x] Revisar y aceptar el ADR 0003 (contrato `Oido`).
 - [ ] Ajustar el silencio de fin de frase (las pausas cortan la frase).
 - [x] Eco: que los avisos del temporizador pasen por el bucle principal.
-- [ ] Revisar y aceptar el ADR 0004 (bucle de eventos).
+- [x] Revisar y aceptar el ADR 0004 (bucle de eventos).
 - [ ] Probar otras voces de Piper en español.
