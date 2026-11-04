@@ -117,4 +117,4 @@ Di `salir` para terminar.
 - [x] Probar otras voces de Piper en español (me quedo con davefx).
 - [ ] Revisar y aceptar el ADR 0005 («Oye Numa»).
 - [ ] Medir falsos positivos de «Oye Numa» con tele o conversación.
-- [ ] Revisar y aceptar el ADR 0006 (cerebro con LLM).
+- [x] Revisar y aceptar el ADR 0006 (cerebro con LLM).

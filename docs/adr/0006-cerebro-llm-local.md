@@ -1,6 +1,6 @@
 # ADR 0006: Cerebro con LLM local: regex primero, LLM con salida estructurada
 
-- **Estado:** propuesta
+- **Estado:** aceptada
 - **Fecha:** 2026-11-04
 
 ## Contexto
