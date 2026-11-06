@@ -24,6 +24,9 @@ class Peticion:
     # o por el LLM (según `parametros`). Siempre texto, venga de donde venga:
     # {"cantidad": "5", "unidad": "minuto"}.
     entidades: dict[str, str] = field(default_factory=dict)
+    # Memoria corta (ADR 0009): los últimos turnos en formato chat. Solo lo
+    # usan las skills que hablan con el LLM (conversar); las demás lo ignoran.
+    historial: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -52,6 +55,11 @@ class Skill(ABC):
     # extraerlas: {"cantidad": {"type": "integer"}, ...}. Todas obligatorias.
     # Deben llamarse igual que los grupos con nombre de `patrones`.
     parametros: dict[str, dict] = {}
+    # Pista extra para el LLM que SOLO se añade a la descripción cuando hay
+    # conversación reciente (memoria corta, ADR 0009). Decidirlo en el código,
+    # no con un "si no hay contexto, ignora esto" en el prompt: un modelo
+    # pequeño sigue mal las instrucciones en negativo (medido: 7/10 → 9/10).
+    pista_contexto: str = ""
 
     @abstractmethod
     def ejecutar(self, peticion: Peticion) -> Respuesta:

@@ -108,22 +108,26 @@ def esperar_evento(cola: queue.Queue[Evento]) -> Evento:
 
 
 def pensar(router: Router, cerebro: Cerebro | None, texto: str,
-           log: logging.Logger) -> Respuesta:
+           log: logging.Logger, conversacion: Conversacion | None = None) -> Respuesta:
     """Regex primero (0 ms, nunca falla); si no encaja, el LLM. Nunca lanza.
 
     Ojo: si la respuesta viene por trozos (`frases`), aquí solo se CREA el
     flujo; el LLM trabaja después, mientras Numa habla (ADR 0008).
+    La memoria (ADR 0009) llega en dos formatos: texto plano al clasificador
+    y mensajes de chat a la skill (conversar).
     """
+    conversacion = conversacion or Conversacion()
     resultado = router.resolver(texto)
     if resultado is None and cerebro is not None:
         inicio = time.perf_counter()
-        resultado = cerebro.resolver(texto)
+        resultado = cerebro.resolver(texto, contexto=conversacion.resumen())
         log.debug("El LLM ha elegido %s en %.0f ms",
                   resultado[0].nombre if resultado else None,
                   (time.perf_counter() - inicio) * 1000)
     if resultado is None:
         return Respuesta("Lo siento, todavía no sé hacer eso.")
     skill, peticion = resultado
+    peticion.historial = conversacion.mensajes()
     try:
         return skill.ejecutar(peticion)
     except Exception:
@@ -236,7 +240,7 @@ def main() -> None:
             return True
         inicio = time.perf_counter()
         maquina.transicionar(Estado.PENSANDO)
-        respuesta = pensar(router, cerebro, texto, log)
+        respuesta = pensar(router, cerebro, texto, log, conversacion)
         # decir() bloquea: medir al final incluiría la duración del audio.
         log.debug("Pensado en %.0f ms", (time.perf_counter() - inicio) * 1000)
         if respuesta.frases is not None:

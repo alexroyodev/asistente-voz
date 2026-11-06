@@ -22,6 +22,8 @@ class TemporizadorSkill(Skill):
     patrones = (
         r"temporizador de (?P<cantidad>\d+) (?P<unidad>segundo|minuto|hora)s?",
     )
+    pista_contexto = ("Si piden 'otro igual' u 'otro', copia la cantidad y la unidad "
+                      "del temporizador de la conversación reciente.")
     parametros = {
         "cantidad": {"type": "integer", "minimum": 1},
         "unidad": {"type": "string", "enum": list(SEGUNDOS_POR_UNIDAD)},

@@ -11,7 +11,7 @@ from asistente.skills.tiempo import TiempoSkill
 
 
 def cargar_skills(avisar: Callable[[str], None] = print,
-                  charlar_en_flujo: Callable[[str, str], Iterator[str]] | None = None):
+                  charlar_en_flujo: Callable[[str, str, list[dict]], Iterator[str]] | None = None):
     # Las skills que quieren decir algo por su cuenta (fuera del turno de
     # respuesta) reciben `avisar`. En el asistente, avisar publica un
     # evento Aviso en la cola: la skill NO habla, pide que se hable (ADR 0004).

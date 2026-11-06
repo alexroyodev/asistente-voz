@@ -23,7 +23,13 @@ INSTRUCCIONES = (
     "Eres Numa, un asistente de voz en español. Responde en una o dos frases "
     "cortas, sin emojis ni listas: lo que digas se leerá en voz alta. "
     "Si no estás seguro de un dato, dilo con sencillez en vez de inventarlo. "
-    "No digas la hora ni el tiempo meteorológico: no los conoces."
+    "No digas la hora ni el tiempo meteorológico: no los conoces. "
+    # Con memoria, el modelo imitaba respuestas anteriores ("Otro temporizador
+    # de 5 minutos en marcha") SIN crear nada: mentir sobre una acción es lo
+    # peor que puede hacer un asistente. Medido: 2/3 mentiras → 0/3.
+    "Tú no puedes hacer acciones: nunca digas que has puesto un temporizador, "
+    "una alarma o cualquier otra cosa; si te piden una acción, di que no la "
+    "has entendido y que lo repitan."
 )
 
 
@@ -32,14 +38,14 @@ class ConversarSkill(Skill):
     descripcion = ("Cualquier otra cosa: saludos, agradecimientos, charla o preguntas "
                    "de cultura general que no sean de las otras intenciones.")
 
-    def __init__(self, charlar_en_flujo: Callable[[str, str], Iterator[str]]) -> None:
+    def __init__(self, charlar_en_flujo: Callable[[str, str, list[dict]], Iterator[str]]) -> None:
         # Recibe la función, no el cliente: así se testea con un LLM falso.
         self._charlar_en_flujo = charlar_en_flujo
 
     def ejecutar(self, peticion: Peticion) -> Respuesta:
         # Nada se pide al LLM todavía: el flujo es perezoso y arranca cuando
         # la voz pide la primera frase.
-        tokens = self._charlar_en_flujo(INSTRUCCIONES, peticion.texto)
+        tokens = self._charlar_en_flujo(INSTRUCCIONES, peticion.texto, peticion.historial)
         return Respuesta(texto="", frases=trocear(_a_prueba_de_fallos(tokens)))
 
 

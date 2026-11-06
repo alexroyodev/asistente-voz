@@ -66,16 +66,18 @@ class ClienteLLM:
     def charlar(self, sistema: str, texto: str) -> str:
         return self._chat(sistema, texto).strip()
 
-    def charlar_en_flujo(self, sistema: str, texto: str) -> Iterator[str]:
+    def charlar_en_flujo(self, sistema: str, texto: str,
+                         historial: Iterable[dict] = ()) -> Iterator[str]:
         """Como charlar(), pero entrega cada token en cuanto Ollama lo genera.
 
         Es un generador perezoso: la petición no sale hasta el primer next().
         Al cerrarlo (close(), p. ej. tras una interrupción), se cierra la
-        conexión y Ollama deja de generar.
+        conexión y Ollama deja de generar. `historial`: turnos anteriores en
+        formato chat (memoria corta, ADR 0009), entre el sistema y la frase.
         """
         flujo = self._cliente.chat(
             model=self.modelo,
-            messages=[{"role": "system", "content": sistema},
+            messages=[{"role": "system", "content": sistema}, *historial,
                       {"role": "user", "content": texto}],
             options={"num_ctx": NUM_CTX}, keep_alive=-1, stream=True,
         )
@@ -96,16 +98,33 @@ class Cerebro:
         self._skills = list(skills)
         # Se generan una vez: las skills no cambian mientras corre el asistente.
         self._esquema = construir_esquema(self._skills)
-        self._instrucciones = construir_instrucciones(self._skills)
+        self._instrucciones = {
+            False: construir_instrucciones(self._skills, hay_contexto=False),
+            True: construir_instrucciones(self._skills, hay_contexto=True),
+        }
 
-    def resolver(self, texto: str) -> tuple[Skill, Peticion] | None:
+    def resolver(self, texto: str, contexto: str = "") -> tuple[Skill, Peticion] | None:
+        """`contexto`: la conversación reciente en texto plano (ADR 0009).
+
+        Va DENTRO del mensaje, no como turnos de chat: si el clasificador
+        viera respuestas de "assistant" en lenguaje natural, se le estaría
+        enseñando a responder con frases en vez de con el JSON pedido.
+        """
         try:
-            datos = self._llm.clasificar(self._instrucciones, self._esquema, texto)
+            datos = self._llm.clasificar(self._instrucciones[bool(contexto)], self._esquema,
+                                         con_contexto(texto, contexto))
         except Exception as e:  # Ollama caído, JSON roto...: seguimos sin LLM
             log.warning("El LLM no ha podido clasificar %r: %r", texto, e)
             return None
         log.debug("LLM: %r → %r", texto, datos)
         return validar(datos, self._skills, texto)
+
+
+def con_contexto(texto: str, contexto: str) -> str:
+    """La petición, precedida de la conversación reciente si la hay."""
+    if not contexto:
+        return texto
+    return f"Conversación reciente:\n{contexto}\n\nPetición actual: {texto}"
 
 
 def construir_esquema(skills: Iterable[Skill]) -> dict:
@@ -133,12 +152,21 @@ def _admitir_null(esquema: dict) -> dict:
     return resultado
 
 
-def construir_instrucciones(skills: Iterable[Skill]) -> str:
-    """El mensaje de sistema: qué es cada intención, sacado de las descripciones."""
+def construir_instrucciones(skills: Iterable[Skill], hay_contexto: bool = False) -> str:
+    """El mensaje de sistema: qué es cada intención, sacado de las descripciones.
+
+    Con `hay_contexto`, se añade la `pista_contexto` de cada skill ("otro
+    igual" → copia los parámetros). Sin conversación previa no aparece, y
+    así el modelo no se inventa un temporizador para "pon otro igual".
+    """
     lineas = ["Clasifica la petición del usuario a un asistente de voz en una intención."]
     for skill in skills:
-        lineas.append(f"- {skill.nombre}: {skill.descripcion}")
+        pista = f" {skill.pista_contexto}" if hay_contexto and skill.pista_contexto else ""
+        lineas.append(f"- {skill.nombre}: {skill.descripcion}{pista}")
     lineas.append("Rellena solo los parámetros de la intención elegida; el resto, null.")
+    lineas.append("Si la petición se refiere a la conversación reciente ('otro igual', "
+                  "'y eso', '¿y él?'), usa esa conversación para elegir la intención "
+                  "y rellenar los parámetros.")
     return "\n".join(lineas)
 
 

@@ -31,7 +31,7 @@ class OllamaFalso:
 def cerebro_con(respuesta: dict | str, error=None):
     contenido = respuesta if isinstance(respuesta, str) else json.dumps(respuesta)
     falso = OllamaFalso(contenido, error)
-    skills = cargar_skills(charlar_en_flujo=lambda s, t: iter(["¡De", " na", "da!"]))
+    skills = cargar_skills(charlar_en_flujo=lambda s, t, h=(): iter(["¡De", " na", "da!"]))
     return Cerebro(ClienteLLM("falso", cliente=falso), skills), falso
 
 
@@ -64,7 +64,7 @@ def test_cerebro_si_falla_el_llm_devuelve_none(respuesta, error):
 
 def frases_de(tokens_o_error):
     """Ejecuta ConversarSkill con un 'LLM' que es un generador (como el real)."""
-    def llm(sistema, texto):
+    def llm(sistema, texto, historial=()):
         for t in tokens_o_error:
             if isinstance(t, Exception):
                 raise t
@@ -91,7 +91,7 @@ def test_cerrar_el_flujo_cierra_el_del_llm():
     # hasta el generador del LLM (que es quien cierra la conexión con Ollama).
     cerrado = []
 
-    def llm(sistema, texto):
+    def llm(sistema, texto, historial=()):
         try:
             yield from ["Primera frase larga. ", "Segunda frase. ", "Tercera."]
         finally:
@@ -106,7 +106,7 @@ def test_cerrar_el_flujo_cierra_el_del_llm():
 def test_conversar_no_llama_al_llm_hasta_pedir_la_primera_frase():
     llamadas = []
 
-    def llm(sistema, texto):
+    def llm(sistema, texto, historial=()):
         llamadas.append(texto)
         yield "Hola."
 
@@ -163,3 +163,62 @@ def test_validar_skill_sin_parametros_ignora_los_demas():
 ])
 def test_validar_rechaza_basura(datos):
     assert validar(datos, SKILLS, "x") is None
+
+
+# --- Memoria corta (ADR 0009) ---------------------------------------------
+
+def test_clasificar_recibe_el_contexto_dentro_del_mensaje():
+    cerebro, falso = cerebro_con({"intencion": "temporizador", "cantidad": 5,
+                                  "unidad": "minuto"})
+    contexto = ("Usuario: pon un temporizador de 5 minutos\n"
+                "Numa: Temporizador de 5 minutos en marcha.")
+    cerebro.resolver("pon otro igual", contexto=contexto)
+    mensajes = falso.llamadas[0]["messages"]
+    assert [m["role"] for m in mensajes] == ["system", "user"]   # sin turnos de chat
+    assert mensajes[1]["content"].startswith("Conversación reciente:\nUsuario: pon")
+    assert mensajes[1]["content"].endswith("Petición actual: pon otro igual")
+
+
+def test_sin_contexto_el_mensaje_es_la_frase_tal_cual():
+    cerebro, falso = cerebro_con({"intencion": "hora"})
+    cerebro.resolver("que hora es")
+    assert falso.llamadas[0]["messages"][1]["content"] == "que hora es"
+
+
+def test_conversar_recibe_el_historial_como_chat():
+    recibido = []
+
+    def llm(sistema, texto, historial=()):
+        recibido.extend(historial)
+        yield "Fue Augusto."
+
+    historial = [{"role": "user", "content": "Háblame de Roma"},
+                 {"role": "assistant", "content": "Roma se fundó en el 753 a.C."}]
+    peticion = Peticion("y quien fue su primer emperador", historial=historial)
+    assert list(ConversarSkill(llm).ejecutar(peticion).frases) == ["Fue Augusto."]
+    assert recibido == historial
+
+
+def test_cliente_coloca_el_historial_entre_sistema_y_frase():
+    falso = OllamaFalso()
+    falso.chat = lambda **kw: falso.llamadas.append(kw) or iter([])
+    historial = [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}]
+    list(ClienteLLM("falso", cliente=falso).charlar_en_flujo("S", "c", historial))
+    roles = [m["role"] for m in falso.llamadas[0]["messages"]]
+    assert roles == ["system", "user", "assistant", "user"]
+
+
+def test_pista_de_contexto_solo_con_conversacion():
+    sin = construir_instrucciones(SKILLS, hay_contexto=False)
+    con = construir_instrucciones(SKILLS, hay_contexto=True)
+    pista = TemporizadorSkill.pista_contexto
+    assert pista and pista not in sin and pista in con
+
+
+def test_cerebro_usa_la_pista_solo_si_hay_contexto():
+    cerebro, falso = cerebro_con({"intencion": "conversar"})
+    cerebro.resolver("pon otro igual")
+    cerebro.resolver("pon otro igual", contexto="Usuario: x\nNuma: y")
+    sistemas = [ll["messages"][0]["content"] for ll in falso.llamadas]
+    assert TemporizadorSkill.pista_contexto not in sistemas[0]
+    assert TemporizadorSkill.pista_contexto in sistemas[1]
