@@ -476,6 +476,61 @@ memoria corta) o paso B de la fase 4 (openWakeWord).
 
 ---
 
+## 2026-11-06 — Fase 6: interrumpir a Numa
+
+**Objetivo:** cortar a Numa mientras habla diciendo "Oye Numa".
+
+**Hecho:**
+- `experimentos/probar_interrupcion.py`: Piper habla y el micro escucha a la
+  vez; ventanas solapadas; puerta de volumen.
+- Decisiones mías: el detector llama a `voz.parar()`; tras cortar, por
+  REPOSO; "para/cállate" solo calla; analizar cada 0,75 s. Código de Claude
+  explicado paso a paso. ADR 0007 (propuesta).
+- `asistente/interrupcion.py` (segundo detector, solo en HABLANDO) y
+  `hablar()` en el bucle. Probado: corta la historia de Roma, una respuesta
+  del LLM y el aviso "¡Tiempo!"; nunca se corta solo. Tests: 120/120.
+
+**Aprendido:**
+- *Barge-in*: hablar y escuchar a la vez. Los altavoces comerciales usan
+  cancelación de eco (AEC); aquí no ha hecho falta.
+- Mientras Piper habla no hay silencio: el VAD no sirve para cortar frases
+  → ventanas fijas (2 s cada 0,75 s, solapadas).
+- Primer experimento: "Oye Numa" detectado a los 1,5 s… sin que yo hablara.
+  Hipótesis 1 ("Hoy hace" ≈ "Oye Numa"): FALSA (con audio limpio, 0
+  falsos). Hipótesis 2: el micro apenas oye a Piper (pico ~0,003) y, con
+  audio débil, la pista `hotwords` hace que Whisper alucine la propia pista.
+  Cierta (2/16 ventanas; 4/16 con vad_filter).
+- **Puerta de volumen**: mi voz llega ~40 veces más fuerte (0,12) que Piper.
+  Umbral 0,005: 0 falsos positivos y Whisper ni se ejecuta con Piper.
+  Medir el PICO de 100 ms, no la media de 2 s (la media diluye la voz).
+- Bug del contador de ventanas: poner a 0 en vez de restar el paso hace que
+  "cada 0,75 s" sea "cada 0,8 s" (deriva acumulada).
+- Periodo refractario: tras cortar, ignorar una ventana; si no, las
+  ventanas solapadas oyen el final de mi frase y cortan la respuesta.
+- Con ventanas la orden puede llegar cortada ("Oye Numa, qué"): al
+  interrumpir, solo callar o Activar() (bip y repetir la orden).
+- `parar()` (escrito en la fase 2 para llamarse desde otro hilo) se usó por
+  fin. `hablar()` con `finally` para que la bandera no se quede activada.
+- UX: con una pausa entre "Oye Numa" y "para", el "para" llegaba tras el
+  bip como orden normal y el LLM se ponía a charlar. Las órdenes de callar
+  (1-2 palabras) se filtran ahora en TODOS los caminos.
+
+**Latencias medidas:**
+- Corte de Piper: ~0,8-1,6 s desde que digo "Oye Numa" (paso 0,75 s +
+  ~0,6 s de Whisper).
+- "Háblame de la historia de Roma": Pensado en ~2 s (clasificar ~0,5 s +
+  redactar ~1,5 s). Con respuestas largas, el LLM es ahora lo más lento.
+
+**Problemas / dudas:**
+- El umbral depende del hardware: recalibrar con otros altavoces o en la Pi.
+- Palabras sueltas mal transcritas: "Para" → "Fuma" → chiste.
+- La flecha ⑨ (HABLANDO → ESCUCHANDO) sigue sin usarse.
+
+**Siguiente:** aceptar ADR 0005 y 0007; fase 6 sigue: latencia (empezar a
+hablar mientras el LLM genera) o memoria corta.
+
+---
+
 ## AAAA-MM-DD — Título
 
 **Objetivo:**

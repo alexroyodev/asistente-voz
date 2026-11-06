@@ -56,6 +56,16 @@ def nivel(ventana: np.ndarray, trozos: int = 20) -> float:
     return max(float(np.sqrt(np.mean(t ** 2))) for t in np.array_split(ventana, trozos) if len(t))
 
 
+def es_orden_de_callar(texto: str) -> bool:
+    """"para", "cállate ya", "silencio": callar. "para qué sirve…": no.
+
+    Solo frases de 1-2 palabras: una orden de silencio es corta, y así
+    "para cuándo es el examen" no se confunde con "para".
+    """
+    palabras = normalizar(texto).split()
+    return 1 <= len(palabras) <= 2 and palabras[0] in ORDENES_CALLAR
+
+
 def decidir(texto: str | None) -> tuple[bool, Evento | None]:
     """(¿hay que cortar?, evento a publicar después).
 
@@ -67,7 +77,7 @@ def decidir(texto: str | None) -> tuple[bool, Evento | None]:
     evento = evento_para(texto)
     if evento is None:
         return False, None
-    if isinstance(evento, Frase) and normalizar(evento.texto).split()[0] in ORDENES_CALLAR:
+    if isinstance(evento, Frase) and es_orden_de_callar(evento.texto):
         return True, None
     return True, Activar()
 

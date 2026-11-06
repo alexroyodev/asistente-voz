@@ -31,6 +31,11 @@ oír a Piper. Para interrumpir hay que escuchar MIENTRAS Piper suena, y:
   - "Oye Numa, para / cállate / silencio / basta…" → nada (solo callar).
   - Cualquier otra cosa → `Activar()`: pita y escucha. La orden NO se usa:
     la ventana puede haberla cortado a medias ("Oye Numa, qué").
+- Las **órdenes de callar** (frases de 1-2 palabras que empiezan por "para",
+  "cállate", "silencio", "basta"…) no se responden **nunca**, lleguen como
+  lleguen: en la misma ventana que "Oye Numa", tras el bip, o como
+  "Oye Numa, para" en `REPOSO`. Probado: con una pausa entre "Oye Numa" y
+  "para", el "para" llegaba tras el bip y el LLM se ponía a charlar.
 - Tras cortar, `decir()` vuelve antes y el bucle sigue por su camino
   normal: `HABLANDO → REPOSO → (evento)`. Sin transiciones nuevas.
 - **Periodo refractario** de 2 s tras cortar: las ventanas solapadas
@@ -58,7 +63,9 @@ oír a Piper. Para interrumpir hay que escuchar MIENTRAS Piper suena, y:
   `experimentos/probar_interrupcion.py`.
 - Tres grabaciones del micro a la vez (activación, interrupción y
   `OidoWhisper`): bien con MME en Windows.
-- "Oye Numa, para cuándo…" se toma como "para" (primera palabra): raro.
+- "Silencio, por favor" (3 palabras) no cuenta como callar; "para qué
+  sirve…" tampoco (bien). Palabras sueltas mal transcritas ("Para" →
+  "Fuma") pueden acabar en el LLM.
 - La flecha ⑨ de la máquina de estados sigue sin usarse.
 - Con openWakeWord (paso B de la fase 4) la detección sería en streaming,
   sin ventanas ni puerta de volumen: más rápida y sin cortar órdenes.

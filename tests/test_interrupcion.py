@@ -7,7 +7,7 @@ import pytest
 
 from asistente.eventos import Activar
 from asistente.interrupcion import (
-    UMBRAL_RMS, Ventanas, decidir, nivel, producir_interrupciones,
+    UMBRAL_RMS, Ventanas, decidir, es_orden_de_callar, nivel, producir_interrupciones,
 )
 
 BLOQUE = 1600  # 100 ms a 16 kHz
@@ -46,12 +46,21 @@ def test_nivel_de_piper_queda_bajo_el_umbral():
     ("Oye Numa, para", (True, None)),
     ("Oye Numa, cállate ya", (True, None)),
     ("Oye Numa, silencio.", (True, None)),
-    ("Oye Numa, para cuándo es el examen", (True, None)),  # limitación conocida
+    ("Oye Numa, para cuándo es el examen", (True, Activar())),  # no es "para"
     ("Hoy hace un día estupendo", (False, None)),
     (None, (False, None)),
 ])
 def test_decidir(texto, esperado):
     assert decidir(texto) == esperado
+
+
+@pytest.mark.parametrize("texto, callar", [
+    ("Para.", True), ("para ya", True), ("¡Cállate!", True), ("Silencio, por favor", False),
+    ("Basta", True), ("Para qué sirve el sol", False), ("parada de autobús", False),
+    ("", False),
+])
+def test_es_orden_de_callar(texto, callar):
+    assert es_orden_de_callar(texto) is callar
 
 
 # --- Ventanas -------------------------------------------------------------

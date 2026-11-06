@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 
 from asistente.activacion import iniciar_activacion
-from asistente.interrupcion import iniciar_interrupciones
+from asistente.interrupcion import es_orden_de_callar, iniciar_interrupciones
 from asistente.cerebro import MODELO_POR_DEFECTO, Cerebro, ClienteLLM
 from asistente.entrada import iniciar_entrada
 from asistente.estado import Estado, MaquinaEstados
@@ -180,6 +180,13 @@ def main() -> None:
         if normalizar(texto) in SALIR:
             voz.decir("¡Hasta luego!")
             return False
+        if es_orden_de_callar(texto):
+            # "Oye Numa" … bip … "para": ya está callado; responder sería
+            # justo lo contrario de lo pedido. Sigue en REPOSO sin decir nada.
+            log.debug("Orden de callar: %r", texto)
+            if maquina.estado is Estado.ESCUCHANDO:
+                maquina.transicionar(Estado.REPOSO)
+            return True
         inicio = time.perf_counter()
         maquina.transicionar(Estado.PENSANDO)
         respuesta = pensar(router, cerebro, texto, log)
