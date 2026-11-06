@@ -1,6 +1,6 @@
 # ADR 0008: Streaming del LLM a la voz por frases
 
-- **Estado:** propuesta
+- **Estado:** aceptada
 - **Fecha:** 2026-11-06
 
 ## Contexto

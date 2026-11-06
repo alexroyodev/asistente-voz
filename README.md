@@ -123,4 +123,4 @@ Di `salir` para terminar.
 - [ ] Medir falsos positivos de «Oye Numa» con tele o conversación.
 - [x] Revisar y aceptar el ADR 0006 (cerebro con LLM).
 - [x] Revisar y aceptar el ADR 0007 (interrupciones).
-- [ ] Revisar y aceptar el ADR 0008 (streaming del LLM a la voz).
+- [x] Revisar y aceptar el ADR 0008 (streaming del LLM a la voz).
