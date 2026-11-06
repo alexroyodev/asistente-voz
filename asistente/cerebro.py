@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 
 from asistente.skills.base import Peticion, Skill
 
@@ -65,6 +65,27 @@ class ClienteLLM:
 
     def charlar(self, sistema: str, texto: str) -> str:
         return self._chat(sistema, texto).strip()
+
+    def charlar_en_flujo(self, sistema: str, texto: str) -> Iterator[str]:
+        """Como charlar(), pero entrega cada token en cuanto Ollama lo genera.
+
+        Es un generador perezoso: la petición no sale hasta el primer next().
+        Al cerrarlo (close(), p. ej. tras una interrupción), se cierra la
+        conexión y Ollama deja de generar.
+        """
+        flujo = self._cliente.chat(
+            model=self.modelo,
+            messages=[{"role": "system", "content": sistema},
+                      {"role": "user", "content": texto}],
+            options={"num_ctx": NUM_CTX}, keep_alive=-1, stream=True,
+        )
+        try:
+            for trozo in flujo:
+                yield trozo.message.content or ""
+        finally:
+            cerrar = getattr(flujo, "close", None)
+            if cerrar is not None:
+                cerrar()
 
 
 class Cerebro:

@@ -1,7 +1,7 @@
 """Registro de skills. Para añadir una nueva: créala y añádela aquí."""
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, Iterator
 
 from asistente.skills.chiste import ChisteSkill
 from asistente.skills.conversar import ConversarSkill
@@ -11,7 +11,7 @@ from asistente.skills.tiempo import TiempoSkill
 
 
 def cargar_skills(avisar: Callable[[str], None] = print,
-                  charlar: Callable[[str, str], str] | None = None):
+                  charlar_en_flujo: Callable[[str, str], Iterator[str]] | None = None):
     # Las skills que quieren decir algo por su cuenta (fuera del turno de
     # respuesta) reciben `avisar`. En el asistente, avisar publica un
     # evento Aviso en la cola: la skill NO habla, pide que se hable (ADR 0004).
@@ -23,6 +23,6 @@ def cargar_skills(avisar: Callable[[str], None] = print,
         ChisteSkill(),
     ]
     # `conversar` solo existe si hay LLM que redacte (ADR 0006).
-    if charlar is not None:
-        skills.append(ConversarSkill(charlar))
+    if charlar_en_flujo is not None:
+        skills.append(ConversarSkill(charlar_en_flujo))
     return skills

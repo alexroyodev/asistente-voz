@@ -31,7 +31,7 @@ class OllamaFalso:
 def cerebro_con(respuesta: dict | str, error=None):
     contenido = respuesta if isinstance(respuesta, str) else json.dumps(respuesta)
     falso = OllamaFalso(contenido, error)
-    skills = cargar_skills(charlar=lambda s, t: "¡De nada!")
+    skills = cargar_skills(charlar_en_flujo=lambda s, t: iter(["¡De", " na", "da!"]))
     return Cerebro(ClienteLLM("falso", cliente=falso), skills), falso
 
 
@@ -50,7 +50,7 @@ def test_cerebro_puede_elegir_conversar():
     cerebro, _ = cerebro_con({"intencion": "conversar", "cantidad": None, "unidad": None})
     skill, peticion = cerebro.resolver("gracias, Numa")
     assert isinstance(skill, ConversarSkill)
-    assert skill.ejecutar(peticion).texto == "¡De nada!"
+    assert list(skill.ejecutar(peticion).frases) == ["¡De nada!"]  # tokens → frase
 
 
 @pytest.mark.parametrize("respuesta, error", [
@@ -62,10 +62,58 @@ def test_cerebro_si_falla_el_llm_devuelve_none(respuesta, error):
     assert cerebro.resolver("lo que sea") is None
 
 
-def test_conversar_si_falla_el_llm_se_disculpa():
-    def roto(sistema, texto):
-        raise ConnectionError
-    assert "perdona" in ConversarSkill(roto).ejecutar(Peticion("hola")).texto
+def frases_de(tokens_o_error):
+    """Ejecuta ConversarSkill con un 'LLM' que es un generador (como el real)."""
+    def llm(sistema, texto):
+        for t in tokens_o_error:
+            if isinstance(t, Exception):
+                raise t
+            yield t
+    return list(ConversarSkill(llm).ejecutar(Peticion("hola")).frases)
+
+
+def test_conversar_si_el_llm_falla_antes_de_hablar_se_disculpa():
+    assert frases_de([ConnectionError()]) == ["Ahora mismo no puedo pensar en eso, perdona."]
+
+
+def test_conversar_si_el_llm_falla_a_mitad_avisa():
+    frases = frases_de(["Roma se fundó en el 753. ", "Rómulo", ConnectionError()])
+    assert frases[0] == "Roma se fundó en el 753."
+    assert frases[-1].endswith("Perdona, me he perdido.")
+
+
+def test_conversar_si_el_llm_no_dice_nada():
+    assert frases_de([" ", ""]) == ["No sé qué decirte a eso."]
+
+
+def test_cerrar_el_flujo_cierra_el_del_llm():
+    # Tras una interrupción, hablar() cierra las frases: el cierre debe llegar
+    # hasta el generador del LLM (que es quien cierra la conexión con Ollama).
+    cerrado = []
+
+    def llm(sistema, texto):
+        try:
+            yield from ["Primera frase larga. ", "Segunda frase. ", "Tercera."]
+        finally:
+            cerrado.append(True)
+
+    frases = ConversarSkill(llm).ejecutar(Peticion("hola")).frases
+    assert next(frases) == "Primera frase larga."
+    frases.close()                      # ← lo que hace hablar() al interrumpir
+    assert cerrado == [True]
+
+
+def test_conversar_no_llama_al_llm_hasta_pedir_la_primera_frase():
+    llamadas = []
+
+    def llm(sistema, texto):
+        llamadas.append(texto)
+        yield "Hola."
+
+    respuesta = ConversarSkill(llm).ejecutar(Peticion("hola"))
+    assert llamadas == []               # perezoso: aún no se ha pedido nada
+    list(respuesta.frases)
+    assert llamadas == ["hola"]
 
 
 def test_sin_llm_no_hay_conversar():

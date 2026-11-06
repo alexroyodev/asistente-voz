@@ -21,6 +21,7 @@ import queue
 import sys
 import threading
 import time
+from typing import Iterator
 from pathlib import Path
 
 from asistente.activacion import iniciar_activacion
@@ -32,6 +33,7 @@ from asistente.eventos import Activar, Aviso, Evento, Frase, Salir
 from asistente.oido import Oido, OidoWhisper
 from asistente.router import Router, normalizar
 from asistente.skills import cargar_skills
+from asistente.skills.base import Respuesta
 from asistente.voz import Voz, VozPiper, VozTexto
 
 SALIR = {"salir", "adios", "hasta luego"}
@@ -105,8 +107,12 @@ def esperar_evento(cola: queue.Queue[Evento]) -> Evento:
 
 
 def pensar(router: Router, cerebro: Cerebro | None, texto: str,
-           log: logging.Logger) -> str:
-    """Regex primero (0 ms, nunca falla); si no encaja, el LLM. Nunca lanza."""
+           log: logging.Logger) -> Respuesta:
+    """Regex primero (0 ms, nunca falla); si no encaja, el LLM. Nunca lanza.
+
+    Ojo: si la respuesta viene por trozos (`frases`), aquí solo se CREA el
+    flujo; el LLM trabaja después, mientras Numa habla (ADR 0008).
+    """
     resultado = router.resolver(texto)
     if resultado is None and cerebro is not None:
         inicio = time.perf_counter()
@@ -115,13 +121,25 @@ def pensar(router: Router, cerebro: Cerebro | None, texto: str,
                   resultado[0].nombre if resultado else None,
                   (time.perf_counter() - inicio) * 1000)
     if resultado is None:
-        return "Lo siento, todavía no sé hacer eso."
+        return Respuesta("Lo siento, todavía no sé hacer eso.")
     skill, peticion = resultado
     try:
-        return skill.ejecutar(peticion).texto
+        return skill.ejecutar(peticion)
     except Exception:
         log.exception("Fallo en la skill %s", skill.nombre)
-        return "Uy, algo ha fallado al hacer eso."
+        return Respuesta("Uy, algo ha fallado al hacer eso.")
+
+
+def medir_primer_sonido(frases: Iterator[str], inicio: float,
+                        log: logging.Logger) -> Iterator[str]:
+    """Deja pasar las frases y apunta cuánto tardó la primera: es lo que
+    percibes como "lo que tarda en contestar" (con el LLM, en streaming)."""
+    primera = True
+    for frase in frases:
+        if primera:
+            log.debug("Primera frase lista en %.0f ms", (time.perf_counter() - inicio) * 1000)
+            primera = False
+        yield frase
 
 
 def main() -> None:
@@ -140,7 +158,7 @@ def main() -> None:
     # Productor: el temporizador (en su hilo) solo publica; hablará este hilo.
     llm = crear_llm(log)
     skills = cargar_skills(avisar=lambda texto: cola.put(Aviso(texto)),
-                           charlar=llm.charlar if llm else None)
+                           charlar_en_flujo=llm.charlar_en_flujo if llm else None)
     router = Router(skills)
     cerebro = Cerebro(llm, skills) if llm else None
     iniciar_entrada(cola, con_texto=oido is None)
@@ -155,18 +173,26 @@ def main() -> None:
         iniciar_activacion(cola, oido.transcribir, escuchando_numa)  # mismo Whisper
         iniciar_interrupciones(cola, oido.transcribir, hablando, voz.parar)
 
-    def hablar(texto: str) -> None:
-        """voz.decir() dejando que el detector de interrupciones escuche.
+    def hablar(respuesta: Respuesta) -> None:
+        """Dice la respuesta dejando que el detector de interrupciones escuche.
 
         Si el detector oye "Oye Numa", llama a voz.parar() desde su hilo:
         decir() vuelve antes de tiempo y el bucle sigue como si hubiera
         terminado (HABLANDO → REPOSO). Lo que viene después llega por la cola.
+        Con `frases` (streaming), Numa habla mientras el LLM sigue escribiendo.
         """
         hablando.set()
         try:
-            voz.decir(texto)
+            if respuesta.frases is not None:
+                voz.decir_frases(respuesta.frases)
+            else:
+                voz.decir(respuesta.texto)
         finally:
             hablando.clear()  # aunque decir() falle: si no, escucharía para siempre
+            if respuesta.frases is not None:
+                # Si nos interrumpieron, quedan frases sin pedir: cerrar el
+                # flujo cierra la conexión y Ollama deja de generar.
+                respuesta.frases.close()
     if oido is None:
         prompt = "> "
     elif con_numa:
@@ -192,6 +218,10 @@ def main() -> None:
         respuesta = pensar(router, cerebro, texto, log)
         # decir() bloquea: medir al final incluiría la duración del audio.
         log.debug("Pensado en %.0f ms", (time.perf_counter() - inicio) * 1000)
+        if respuesta.frases is not None:
+            # En streaming, "pensado" solo es elegir skill: el LLM aún no ha
+            # escrito nada. Lo que se nota es cuándo llega la primera frase.
+            respuesta.frases = medir_primer_sonido(respuesta.frases, inicio, log)
         maquina.transicionar(Estado.HABLANDO)
         hablar(respuesta)  # interrumpible
         maquina.transicionar(Estado.REPOSO)
@@ -224,7 +254,7 @@ def main() -> None:
                 case Aviso(texto=texto):           # ⑥ aviso proactivo
                     print()  # el prompt ya estaba impreso: el aviso, en su línea
                     maquina.transicionar(Estado.HABLANDO)
-                    hablar(texto)  # interrumpible: "Oye Numa, para"
+                    hablar(Respuesta(texto))  # interrumpible: "Oye Numa, para"
                     maquina.transicionar(Estado.REPOSO)
                 case Salir():
                     seguir = False
