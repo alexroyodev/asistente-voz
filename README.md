@@ -88,6 +88,7 @@ Di `salir` para terminar.
 | `asistente/oido.py` | Contrato `Oido`: `OidoWhisper` (micrófono + VAD + Whisper) |
 | `asistente/router.py` | Elige la skill para cada frase (regex: vía rápida) |
 | `asistente/cerebro.py` | Elige la skill con el LLM si la regex no encaja |
+| `asistente/trocear.py` | Parte el texto del LLM en frases para hablar en streaming |
 | `asistente/voz.py` | Contrato `Voz`: `VozTexto` y `VozPiper` |
 | `asistente/skills/` | Habilidades; `base.py` es el contrato |
 | `experimentos/` | Pruebas sueltas de librerías, fuera del asistente |
@@ -105,7 +106,7 @@ Di `salir` para terminar.
 | 3 | Entrada de voz con faster-whisper + VAD (pulsar para hablar) | ✅ (afinando) |
 | 4 | Palabra de activación «Oye Numa» (A: Whisper ✅ · B: openWakeWord) | ⏳ |
 | 5 | Cerebro con LLM local (Ollama + salida estructurada) | ✅ |
-| 6 | Pulido: interrupciones ✅, latencia, memoria corta | ⏳ |
+| 6 | Pulido: interrupciones ✅, latencia ✅, memoria corta | ⏳ |
 | 7 | Satélite (Raspberry Pi) + servidor | |
 
 ## Pendientes
@@ -122,3 +123,4 @@ Di `salir` para terminar.
 - [ ] Medir falsos positivos de «Oye Numa» con tele o conversación.
 - [x] Revisar y aceptar el ADR 0006 (cerebro con LLM).
 - [x] Revisar y aceptar el ADR 0007 (interrupciones).
+- [ ] Revisar y aceptar el ADR 0008 (streaming del LLM a la voz).

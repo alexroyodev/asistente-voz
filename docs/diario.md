@@ -531,6 +531,54 @@ hablar mientras el LLM genera) o memoria corta.
 
 ---
 
+## 2026-11-06 — Fase 6: latencia (streaming del LLM a la voz)
+
+**Objetivo:** que Numa empiece a hablar antes con las respuestas del LLM.
+
+**Hecho:**
+- Medido: el primer token llega en 20-45 ms; lo lento es terminar.
+- Decisiones mías: solo streaming (sin tocar el silencio de fin ni
+  Whisper); `Respuesta.frases` + `Voz.decir_frases`; cortar en fin de frase
+  y en comas si el trozo es largo. Código de Claude explicado paso a paso.
+  ADR 0008 (propuesta).
+- `trocear.py`, `ClienteLLM.charlar_en_flujo`, `ConversarSkill` con flujo,
+  `hablar()` que cierra el flujo, log "Primera frase lista".
+- Probado por voz: Roma, primera frase a los ~0,8-1 s (antes ~2 s);
+  interrumpida tras el primer trozo, y "Para." tras el bip calla. Tests: 136/136.
+
+**Aprendido:**
+- Latencia PERCIBIDA frente a total: con streaming la respuesta completa
+  tarda lo mismo, pero empieza a sonar ~1,2 s antes en respuestas largas.
+- Pipeline perezosa de generadores (LLM → trocear → decir_frases): nadie
+  pide el siguiente dato hasta necesitarlo. Ollama sigue generando en su
+  proceso mientras Piper habla: paralelismo sin crear hilos.
+- Un "." al final de lo recibido aún no es fin de frase: puede venir ",",
+  un número… Solo con el espacio detrás se sabe. Abreviaturas ("a.C. hasta")
+  parten la frase: pausa rara aceptada.
+- `parar()` debe cortar TODO el flujo: un solo `clear()` para el flujo
+  entero; `decir()` pasa a ser `decir_frases([texto])`.
+- Las excepciones de un generador salen donde se CONSUME, no donde se crea:
+  el try/except de `pensar()` ya no las ve → capturar dentro del flujo.
+- Cerrar el flujo (`close()`) propaga `GeneratorExit` en cadena hasta el
+  generador de Ollama: si no, seguiría generando para nadie tras interrumpir.
+- Con streaming, "Pensado en" ya no mide lo que se nota: nueva métrica
+  "Primera frase lista". Cambiar el diseño obliga a revisar las métricas.
+- Un test que no puede fallar no sirve (rehíce uno con un `or` que siempre
+  se cumplía).
+
+**Latencias medidas:**
+- Roma: primera frase 749-978 ms (antes ~2000). Cielo azul: 1189 ms (antes
+  ~1700). Cortas, igual. Clasificar sigue costando ~0,5-0,7 s.
+
+**Problemas / dudas:**
+- Pausa corta entre trozos (Piper sintetiza el siguiente al acabar el actual).
+- Idea: ahorrar la llamada de clasificar cuando es obviamente charla, o
+  clasificar y responder en una sola llamada.
+
+**Siguiente:** aceptar ADR 0008; memoria corta (último frente de la fase 6).
+
+---
+
 ## AAAA-MM-DD — Título
 
 **Objetivo:**
