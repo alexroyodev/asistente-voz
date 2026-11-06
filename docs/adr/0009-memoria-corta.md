@@ -17,6 +17,9 @@ debe vivir en las skills (varios satélites en la fase 7).
   (`deque(maxlen=3)`), que **caducan a los 120 s** sin hablar
   (`time.monotonic`, reloj inyectable). La posee el hilo principal; en la
   fase 7, una por satélite. Las skills siguen sin estado de conversación.
+- La caducidad se decide **al empezar el turno** (`empezar_turno()`), nunca
+  al anotar: un turno que empezó a los 115 s y usó la memoria no puede
+  borrarla al terminar a los 125 s (bug encontrado probando por voz).
 - Se anota **lo que Numa llegó a decir**: `hablar()` devuelve las frases
   entregadas a la voz; si la interrumpes, el resto ni existe.
 - La memoria llega al LLM en **dos formatos**:

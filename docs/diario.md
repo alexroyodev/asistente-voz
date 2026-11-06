@@ -579,6 +579,54 @@ hablar mientras el LLM genera) o memoria corta.
 
 ---
 
+## 2026-11-06 — Fase 6: memoria corta
+
+**Objetivo:** que Numa entienda "pon otro igual" o "¿y su primer emperador?".
+
+**Hecho:**
+- Decisiones mías: objeto `Conversacion` del bucle (no en las skills ni en
+  el cliente); 3 turnos que caducan a los 2 min; memoria para clasificar y
+  para conversar; anotar solo lo que Numa llegó a decir. Código de Claude
+  explicado paso a paso. ADR 0009 (propuesta).
+- `conversacion.py` (deque maxlen, reloj inyectado), `hablar()` devuelve lo
+  que sonó, `Peticion.historial`, contexto para el clasificador,
+  `Skill.pista_contexto`, honestidad en `conversar`.
+- Probado por voz: "pon otro igual" crea un 2.º temporizador real (sonaron
+  los dos avisos); "¿y quién fue su primer emperador?" sigue el hilo de
+  Roma. Tests: 149/149.
+
+**Aprendido:**
+- El LLM no recuerda: la memoria es reenviarle los turnos. Ocupa contexto
+  (num_ctx 2048) y puede contaminar temas nuevos → corta y con caducidad.
+- `deque(maxlen=N)`: búfer circular. `time.monotonic()` para intervalos
+  (no salta si cambia la hora del sistema).
+- La memoria va en DOS formatos: chat para conversar; texto dentro del
+  mensaje para el clasificador (turnos "assistant" en lenguaje natural le
+  enseñarían a no responder en JSON).
+- **Numa mintió**: con memoria, "pon otro igual" fue a conversar, que imitó
+  "Temporizador adicional de 5 minutos en marcha" SIN crearlo. Ningún test
+  lo habría detectado: hay que LEER salidas reales. Arreglos medidos con la
+  misma batería de 10 casos y 2 rondas:
+  - Instrucción de honestidad en conversar: 2/3 mentiras → 0/3.
+  - Pista "otro igual" en la descripción del temporizador, añadida por el
+    CÓDIGO solo si hay contexto: 9/10. Pedírselo al modelo en negativo
+    ("si no hubo ninguno, no…") dio 7/10 y rompió "media hora" (→ 30 horas).
+- Mover decisiones del prompt al código las hace deterministas.
+- Bug de la caducidad, encontrado probando por voz: se comprobaba también
+  al anotar, así que un turno que USÓ la memoria podía borrarla al acabar.
+  Ahora se decide en `empezar_turno()` y el log distingue usada/guardada.
+- La memoria no crea capacidades: "¿y mañana?" se entiende, pero la skill
+  del tiempo solo sabe el de ahora.
+
+**Problemas / dudas:**
+- "pon otro igual" tras un tema sin temporizador puede inventarse uno.
+- Augusto "murió en el 14 a.C." (es d.C.): alucinaciones del 3B.
+
+**Siguiente:** aceptar ADR 0009; la fase 6 queda completa. Opciones:
+ahorrar la llamada de clasificar, paso B (openWakeWord) o fase 7.
+
+---
+
 ## AAAA-MM-DD — Título
 
 **Objetivo:**

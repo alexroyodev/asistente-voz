@@ -59,5 +59,19 @@ def test_tras_caducar_empieza_de_cero():
     c = Conversacion(caduca_s=120, reloj=reloj)
     c.anotar("tema viejo", "...")
     reloj.ahora += 300
+    assert c.empezar_turno() == 0        # al empezar el turno, olvida
     c.anotar("tema nuevo", "...")
     assert c.turnos() == [Turno("tema nuevo", "...")]
+
+
+def test_un_turno_que_uso_la_memoria_no_la_borra_al_acabar():
+    # A los 115 s se pregunta (la memoria vale y se usa); Numa habla 10 s;
+    # al anotar, a los 125 s, el contexto usado debe seguir ahí.
+    reloj = Reloj()
+    c = Conversacion(caduca_s=120, reloj=reloj)
+    c.anotar("Háblame de Roma", "Roma...")
+    reloj.ahora += 115
+    assert c.empezar_turno() == 1        # al empezar el turno: aún vale y se usa
+    reloj.ahora += 10
+    c.anotar("¿Y su primer emperador?", "Augusto.")
+    assert [t.usuario for t in c.turnos()] == ["Háblame de Roma", "¿Y su primer emperador?"]

@@ -35,8 +35,17 @@ class Conversacion:
         self._reloj = reloj  # inyectado: los tests "adelantan el tiempo"
         self._ultimo = 0.0
 
-    def anotar(self, usuario: str, numa: str) -> None:
+    def empezar_turno(self) -> int:
+        """Llamar al empezar a atender cada frase. Olvida si ha caducado y
+        devuelve cuántos turnos se van a usar como memoria."""
         self._olvidar_si_caducada()
+        return len(self._turnos)
+
+    def anotar(self, usuario: str, numa: str) -> None:
+        # Aquí NO se comprueba la caducidad: se comprobó en empezar_turno().
+        # Si se comprobara también aquí, un turno que empezó a los 115 s (y
+        # usó la memoria) la borraría al acabar, a los 125 s, junto con el
+        # contexto que acababa de usar.
         self._turnos.append(Turno(usuario.strip(), numa.strip()))
         self._ultimo = self._reloj()
 

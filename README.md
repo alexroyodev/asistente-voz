@@ -73,6 +73,7 @@ Prueba: "Oye Numa, ¿qué hora es?" (o "Oye Numa", bip, y la orden), "pon un tem
 "¿qué tiempo hace?", "cuéntame un chiste". Con LLM también: "¿necesito
 paraguas?", "avísame en media hora", "¿cuál es la capital de Francia?".
 Mientras Numa habla, «Oye Numa» la interrumpe y «Oye Numa, para» la calla.
+Recuerda los últimos turnos: «pon otro igual», «¿y quién fue su primer emperador?».
 Di `salir` para terminar.
 
 ## Estructura
@@ -89,6 +90,7 @@ Di `salir` para terminar.
 | `asistente/router.py` | Elige la skill para cada frase (regex: vía rápida) |
 | `asistente/cerebro.py` | Elige la skill con el LLM si la regex no encaja |
 | `asistente/trocear.py` | Parte el texto del LLM en frases para hablar en streaming |
+| `asistente/conversacion.py` | Memoria corta: últimos 3 turnos, caducan a los 2 min |
 | `asistente/voz.py` | Contrato `Voz`: `VozTexto` y `VozPiper` |
 | `asistente/skills/` | Habilidades; `base.py` es el contrato |
 | `experimentos/` | Pruebas sueltas de librerías, fuera del asistente |
@@ -106,7 +108,7 @@ Di `salir` para terminar.
 | 3 | Entrada de voz con faster-whisper + VAD (pulsar para hablar) | ✅ (afinando) |
 | 4 | Palabra de activación «Oye Numa» (A: Whisper ✅ · B: openWakeWord) | ⏳ |
 | 5 | Cerebro con LLM local (Ollama + salida estructurada) | ✅ |
-| 6 | Pulido: interrupciones ✅, latencia ✅, memoria corta | ⏳ |
+| 6 | Pulido: interrupciones, latencia (streaming), memoria corta | ✅ |
 | 7 | Satélite (Raspberry Pi) + servidor | |
 
 ## Pendientes
@@ -124,3 +126,4 @@ Di `salir` para terminar.
 - [x] Revisar y aceptar el ADR 0006 (cerebro con LLM).
 - [x] Revisar y aceptar el ADR 0007 (interrupciones).
 - [x] Revisar y aceptar el ADR 0008 (streaming del LLM a la voz).
+- [ ] Revisar y aceptar el ADR 0009 (memoria corta).

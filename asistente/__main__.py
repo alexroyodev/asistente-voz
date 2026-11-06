@@ -240,6 +240,8 @@ def main() -> None:
             return True
         inicio = time.perf_counter()
         maquina.transicionar(Estado.PENSANDO)
+        # La caducidad se decide AQUÍ, al empezar el turno (no al anotar).
+        log.debug("Memoria usada: %d turno(s)", conversacion.empezar_turno())
         respuesta = pensar(router, cerebro, texto, log, conversacion)
         # decir() bloquea: medir al final incluiría la duración del audio.
         log.debug("Pensado en %.0f ms", (time.perf_counter() - inicio) * 1000)
@@ -250,7 +252,7 @@ def main() -> None:
         maquina.transicionar(Estado.HABLANDO)
         dicho = hablar(respuesta)  # interrumpible
         conversacion.anotar(texto, dicho)
-        log.debug("Memoria: %d turno(s)", len(conversacion.turnos()))
+        log.debug("Memoria guardada: %d turno(s)", len(conversacion.turnos()))
         maquina.transicionar(Estado.REPOSO)
         return True
 
