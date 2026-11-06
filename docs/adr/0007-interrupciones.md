@@ -1,6 +1,6 @@
 # ADR 0007: Interrumpir a Numa mientras habla ("Oye Numa, para")
 
-- **Estado:** propuesta
+- **Estado:** aceptada
 - **Fecha:** 2026-11-04
 
 ## Contexto

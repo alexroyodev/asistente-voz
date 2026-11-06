@@ -118,7 +118,7 @@ Di `salir` para terminar.
 - [x] Eco: que los avisos del temporizador pasen por el bucle principal.
 - [x] Revisar y aceptar el ADR 0004 (bucle de eventos).
 - [x] Probar otras voces de Piper en español (me quedo con davefx).
-- [ ] Revisar y aceptar el ADR 0005 («Oye Numa»).
+- [x] Revisar y aceptar el ADR 0005 («Oye Numa»).
 - [ ] Medir falsos positivos de «Oye Numa» con tele o conversación.
 - [x] Revisar y aceptar el ADR 0006 (cerebro con LLM).
-- [ ] Revisar y aceptar el ADR 0007 (interrupciones).
+- [x] Revisar y aceptar el ADR 0007 (interrupciones).

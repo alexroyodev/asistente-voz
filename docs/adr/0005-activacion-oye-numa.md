@@ -1,6 +1,6 @@
 # ADR 0005: Activación por voz "Oye Numa" con VAD + Whisper (provisional)
 
-- **Estado:** propuesta
+- **Estado:** aceptada
 - **Fecha:** 2026-11-04
 
 ## Contexto
