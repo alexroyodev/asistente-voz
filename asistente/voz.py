@@ -24,6 +24,7 @@ import logging
 import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Iterable
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +41,16 @@ class Voz(ABC):
         Seguro entre hilos: las llamadas concurrentes se ejecutan una detrás
         de otra, nunca solapadas.
         """
+
+    def decir_frases(self, frases: Iterable[str]) -> None:
+        """Dice cada frase en cuanto llega (fase 6: streaming del LLM, ADR 0008).
+
+        Por defecto, una detrás de otra con decir(). Las implementaciones que
+        soportan parar() deben reimplementarlo para que parar() corte TODO el
+        flujo, no solo la frase en curso.
+        """
+        for frase in frases:
+            self.decir(frase)
 
     def parar(self) -> None:
         """Corta lo que se esté diciendo. Por defecto, nada.
@@ -85,19 +96,30 @@ class VozPiper(Voz):
         self._cortar = threading.Event()
 
     def decir(self, texto: str) -> None:
+        self.decir_frases([texto])
+
+    def decir_frases(self, frases: Iterable[str]) -> None:
+        # Un solo lock y un solo clear() para todo el flujo: así un parar()
+        # en mitad corta también las frases que aún no han llegado.
+        with self._lock:
+            self._cortar.clear()
+            for frase in frases:  # cada next() puede esperar al LLM
+                if self._cortar.is_set():
+                    return
+                print(frase)  # mientras desarrollamos: ver qué dice ayuda a oír fallos
+                self._reproducir(frase)
+
+    def _reproducir(self, texto: str) -> None:
         import numpy as np
 
-        with self._lock:
-            print(texto)  # mientras desarrollamos: ver qué dice ayuda a oír fallos
-            self._cortar.clear()
-            # synthesize() da un trozo por frase: cada frase empieza a sonar
-            # sin esperar a que estén sintetizadas las siguientes.
-            for chunk in self._voz.synthesize(texto):
-                if self._cortar.is_set():
-                    break
-                audio = np.frombuffer(chunk.audio_int16_bytes, dtype=np.int16)
-                self._sd.play(audio, chunk.sample_rate)
-                self._sd.wait()
+        # synthesize() da un trozo por frase: cada frase empieza a sonar
+        # sin esperar a que estén sintetizadas las siguientes.
+        for chunk in self._voz.synthesize(texto):
+            if self._cortar.is_set():
+                return
+            audio = np.frombuffer(chunk.audio_int16_bytes, dtype=np.int16)
+            self._sd.play(audio, chunk.sample_rate)
+            self._sd.wait()
 
     def pitar(self) -> None:
         with self._lock:

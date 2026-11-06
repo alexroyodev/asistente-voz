@@ -58,3 +58,26 @@ def test_tono_sin_chasquidos():
     assert onda.dtype.name == "float32"
     assert abs(onda[0]) < 0.01 and abs(onda[-1]) < 0.01  # empieza y acaba en silencio
     assert abs(onda).max() <= 0.3 + 1e-6                  # respeta el volumen
+
+
+def test_decir_frases_por_defecto_dice_cada_una(capsys):
+    VozTexto().decir_frases(iter(["Primera.", "Segunda."]))
+    assert capsys.readouterr().out == "Primera.\nSegunda.\n"
+
+
+def test_decir_frases_consume_el_flujo_poco_a_poco():
+    # Cada frase se dice ANTES de pedir la siguiente: así Piper habla
+    # mientras el LLM sigue escribiendo.
+    orden = []
+
+    class VozApunta(Voz):
+        def decir(self, texto):
+            orden.append(f"dice {texto}")
+
+    def flujo():
+        for f in ("a", "b"):
+            orden.append(f"llega {f}")
+            yield f
+
+    VozApunta().decir_frases(flujo())
+    assert orden == ["llega a", "dice a", "llega b", "dice b"]

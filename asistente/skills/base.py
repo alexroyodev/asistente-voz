@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Iterator
 
 
 @dataclass
@@ -27,10 +28,17 @@ class Peticion:
 
 @dataclass
 class Respuesta:
-    """Lo que el asistente va a decir (de momento, a imprimir)."""
+    """Lo que el asistente va a decir.
+
+    Casi todas las skills tienen la respuesta entera al momento: `texto`.
+    Las que la generan poco a poco (el LLM) pueden dar `frases`: un iterador
+    que entrega cada frase en cuanto está lista, para que Piper empiece a
+    hablar antes de que exista la respuesta completa (ADR 0008).
+    """
 
     texto: str
     fin_conversacion: bool = False
+    frases: Iterator[str] | None = None
 
 
 class Skill(ABC):
