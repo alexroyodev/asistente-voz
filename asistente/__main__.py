@@ -27,6 +27,7 @@ from pathlib import Path
 from asistente.activacion import iniciar_activacion
 from asistente.interrupcion import es_orden_de_callar, iniciar_interrupciones
 from asistente.cerebro import MODELO_POR_DEFECTO, Cerebro, ClienteLLM
+from asistente.conversacion import Conversacion
 from asistente.entrada import iniciar_entrada
 from asistente.estado import Estado, MaquinaEstados
 from asistente.eventos import Activar, Aviso, Evento, Frase, Salir
@@ -130,6 +131,17 @@ def pensar(router: Router, cerebro: Cerebro | None, texto: str,
         return Respuesta("Uy, algo ha fallado al hacer eso.")
 
 
+def apuntar(frases: Iterator[str], dichas: list[str]) -> Iterator[str]:
+    """Deja pasar las frases y apunta cada una al entregarla a la voz.
+
+    Como la voz pide la siguiente frase solo tras decir la anterior, lo
+    apuntado es exactamente lo que empezó a sonar.
+    """
+    for frase in frases:
+        dichas.append(frase)
+        yield frase
+
+
 def medir_primer_sonido(frases: Iterator[str], inicio: float,
                         log: logging.Logger) -> Iterator[str]:
     """Deja pasar las frases y apunta cuánto tardó la primera: es lo que
@@ -161,6 +173,8 @@ def main() -> None:
                            charlar_en_flujo=llm.charlar_en_flujo if llm else None)
     router = Router(skills)
     cerebro = Cerebro(llm, skills) if llm else None
+    # Memoria corta (ADR 0009): la posee este hilo, como el resto del estado.
+    conversacion = Conversacion(turnos=3, caduca_s=120)
     iniciar_entrada(cola, con_texto=oido is None)
 
     # El detector de "Oye Numa" solo escucha cuando este hilo le da paso
@@ -173,20 +187,27 @@ def main() -> None:
         iniciar_activacion(cola, oido.transcribir, escuchando_numa)  # mismo Whisper
         iniciar_interrupciones(cola, oido.transcribir, hablando, voz.parar)
 
-    def hablar(respuesta: Respuesta) -> None:
+    def hablar(respuesta: Respuesta) -> str:
         """Dice la respuesta dejando que el detector de interrupciones escuche.
 
         Si el detector oye "Oye Numa", llama a voz.parar() desde su hilo:
         decir() vuelve antes de tiempo y el bucle sigue como si hubiera
         terminado (HABLANDO → REPOSO). Lo que viene después llega por la cola.
         Con `frases` (streaming), Numa habla mientras el LLM sigue escribiendo.
+
+        Devuelve lo que LLEGÓ A DECIR (para la memoria, ADR 0009): con
+        streaming, las frases que empezaron a sonar; si la cortaste tras la
+        primera, el resto ni existe.
         """
+        dichas: list[str] = []
         hablando.set()
         try:
             if respuesta.frases is not None:
-                voz.decir_frases(respuesta.frases)
+                voz.decir_frases(apuntar(respuesta.frases, dichas))
             else:
                 voz.decir(respuesta.texto)
+                dichas.append(respuesta.texto)
+            return " ".join(dichas)
         finally:
             hablando.clear()  # aunque decir() falle: si no, escucharía para siempre
             if respuesta.frases is not None:
@@ -223,7 +244,9 @@ def main() -> None:
             # escrito nada. Lo que se nota es cuándo llega la primera frase.
             respuesta.frases = medir_primer_sonido(respuesta.frases, inicio, log)
         maquina.transicionar(Estado.HABLANDO)
-        hablar(respuesta)  # interrumpible
+        dicho = hablar(respuesta)  # interrumpible
+        conversacion.anotar(texto, dicho)
+        log.debug("Memoria: %d turno(s)", len(conversacion.turnos()))
         maquina.transicionar(Estado.REPOSO)
         return True
 
