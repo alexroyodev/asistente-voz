@@ -1,6 +1,6 @@
 # ADR 0009: Memoria corta de la conversación
 
-- **Estado:** propuesta
+- **Estado:** aceptada
 - **Fecha:** 2026-11-06
 
 ## Contexto

@@ -126,4 +126,4 @@ Di `salir` para terminar.
 - [x] Revisar y aceptar el ADR 0006 (cerebro con LLM).
 - [x] Revisar y aceptar el ADR 0007 (interrupciones).
 - [x] Revisar y aceptar el ADR 0008 (streaming del LLM a la voz).
-- [ ] Revisar y aceptar el ADR 0009 (memoria corta).
+- [x] Revisar y aceptar el ADR 0009 (memoria corta).
